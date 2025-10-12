@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-gray-900 text-gray-100 font-sans antialiased;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm md:text-base;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-700 hover:bg-gray-600 text-gray-100 px-4 py-2 rounded-lg font-medium transition-colors text-sm md:text-base;
+  }
+
+  .card {
+    @apply bg-gray-800 border border-gray-700 rounded-lg p-4 md:p-6;
+  }
+
+  .input-field {
+    @apply bg-gray-800 border border-gray-600 text-gray-100 px-3 py-2 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm md:text-base;
+  }
+
+  .modal {
+    @apply fixed inset-0 z-50 flex items-center justify-center p-4;
+  }
+
+  .modal-backdrop {
+    @apply fixed inset-0 bg-black bg-opacity-50;
+  }
+
+  .modal-content {
+    @apply bg-gray-800 border border-gray-600 rounded-lg p-4 md:p-6 max-w-md w-full relative z-10;
+  }
+
+  /* Classes utilitaires pour mobile */
+  .mobile-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6;
+  }
+
+  .mobile-padding {
+    @apply p-4 md:p-6;
+  }
+
+  .mobile-text {
+    @apply text-sm md:text-base;
+  }
+
+  .mobile-header {
+    @apply text-xl md:text-2xl;
+  }
+
+  /* Amélioration des cartes sur mobile */
+  .card-mobile {
+    @apply bg-gray-800 border border-gray-700 rounded-lg p-3 md:p-4 lg:p-6;
+  }
+}
