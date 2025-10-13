@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, Building2, Eye, Play, CheckCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, Building2, Eye, Play, CheckCircle, Check } from 'lucide-react';
 import { entreprisesService, commandesService } from '../../firebase/entreprises';
 import { rendezVousService } from '../../firebase/calendar';
 import type { Entreprise, Commande } from '../../firebase/entreprises';
@@ -725,23 +725,31 @@ function RendezVousForm({
         </div>
 
         {/* Case à cocher confirmation */}
-        <div className="flex items-center space-x-3 p-3 bg-gray-700 rounded-lg">
-          <input
-            type="checkbox"
-            id="confirme"
-            checked={formData.confirme}
-            onChange={(e) => setFormData(prev => ({ ...prev, confirme: e.target.checked }))}
-            className="w-4 h-4 text-primary-600 bg-gray-800 border-gray-600 rounded focus:ring-primary-500 focus:ring-2"
-          />
-          <label htmlFor="confirme" className="text-sm text-gray-300 cursor-pointer">
-            Rendez-vous confirmé par l'entreprise
-          </label>
-          {formData.confirme && (
-            <div className="text-xs text-green-400 flex items-center space-x-1">
-              <CheckCircle className="w-3 h-3" />
-              <span>Confirmé</span>
+        <div className="p-4 bg-blue-600/10 border border-blue-600/30 rounded-lg">
+          <div className="flex items-start space-x-3">
+            <input
+              type="checkbox"
+              id="confirme"
+              checked={formData.confirme}
+              onChange={(e) => setFormData(prev => ({ ...prev, confirme: e.target.checked }))}
+              className="mt-1 w-5 h-5 text-primary-600 bg-gray-800 border-gray-500 rounded focus:ring-primary-500 focus:ring-2"
+              style={{ accentColor: '#0284c7' }}
+            />
+            <div className="flex-1">
+              <label htmlFor="confirme" className="text-sm font-medium text-blue-100 cursor-pointer block mb-1">
+                ✓ Rendez-vous confirmé par l'entreprise
+              </label>
+              <p className="text-xs text-blue-200">
+                Cochez cette case quand l'entreprise a confirmé sa présence au rendez-vous
+              </p>
+              {formData.confirme && (
+                <div className="mt-2 text-xs text-green-400 flex items-center space-x-1 bg-green-600/20 rounded px-2 py-1">
+                  <Check className="w-4 h-4" />
+                  <span className="font-medium">Rendez-vous confirmé</span>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
 
         <div>
