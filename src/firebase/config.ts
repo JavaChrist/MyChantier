@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getAuth } from 'firebase/auth';
 
 // Configuration Firebase avec les variables d'environnement
 const firebaseConfig = {
@@ -29,12 +30,14 @@ if (missingVars.length > 0) {
   console.error('Assure-toi que ton fichier .env.local contient toutes les variables avec le préfixe VITE_');
 }
 
+
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
 // Initialize services
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+export const auth = getAuth(app);
 
 // Export de la config pour debug
 export { firebaseConfig };

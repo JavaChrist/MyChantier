@@ -1,6 +1,5 @@
 import React from 'react';
-import { Building2, FileText, ShoppingCart, Calendar, AlertCircle, CheckCircle, Settings } from 'lucide-react';
-import { testFirebaseSetup } from '../utils/testFirebase';
+import { Building2, FileText, ShoppingCart, Calendar, AlertCircle, CheckCircle } from 'lucide-react';
 
 export function Dashboard() {
   // Mock data - sera remplacé par les vraies données de la DB
@@ -20,26 +19,12 @@ export function Dashboard() {
     { type: 'tache', message: 'Tâche terminée: Démontage carrelage existant', date: '2024-01-12' },
   ];
 
-  const handleTestFirebase = async () => {
-    console.log('🔧 Test Firebase déclenché depuis le Dashboard');
-    await testFirebaseSetup();
-  };
 
   return (
     <div className="mobile-padding space-y-4 md:space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="mobile-header font-bold text-gray-100 mb-2">Dashboard</h1>
-          <p className="text-gray-400 mobile-text">Vue d'ensemble de vos chantiers</p>
-        </div>
-        <button
-          onClick={handleTestFirebase}
-          className="btn-secondary flex items-center space-x-2 text-sm"
-          title="Tester la configuration Firebase"
-        >
-          <Settings className="w-4 h-4" />
-          <span className="hidden sm:inline">Test Firebase</span>
-        </button>
+      <div>
+        <h1 className="mobile-header font-bold text-gray-100 mb-2">Dashboard</h1>
+        <p className="text-gray-400 mobile-text">Vue d'ensemble de vos chantiers</p>
       </div>
 
       {/* Statistiques */}

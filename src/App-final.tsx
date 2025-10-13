@@ -285,6 +285,7 @@ function PrestationsPage({ prestations, entreprises }: { prestations: Prestation
 
 function App() {
   const [currentView, setCurrentView] = useState('dashboard');
+
   const [entreprises] = useState<Entreprise[]>(initialEntreprises);
   const [prestations] = useState<Prestation[]>(initialPrestations);
 
@@ -310,13 +311,19 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-900">
       {/* Navigation mobile */}
-      <MobileNavigation currentView={currentView} onViewChange={setCurrentView} />
+      <MobileNavigation
+        currentView={currentView}
+        onViewChange={setCurrentView}
+      />
 
       {/* Layout desktop/mobile */}
       <div className="flex">
         {/* Navigation desktop - cachée sur mobile */}
         <div className="hidden lg:block">
-          <Navigation currentView={currentView} onViewChange={setCurrentView} />
+          <Navigation
+            currentView={currentView}
+            onViewChange={setCurrentView}
+          />
         </div>
 
         {/* Contenu principal */}

@@ -57,12 +57,15 @@ self.addEventListener("activate", (event) => {
 
 // Interception des requêtes (stratégie Network First pour Firebase)
 self.addEventListener("fetch", (event) => {
-  // Ignorer les requêtes non-GET et les requêtes Firebase
+  // Ignorer les requêtes non-GET, Firebase et extensions
   if (
     event.request.method !== "GET" ||
     event.request.url.includes("firebaseapp.com") ||
     event.request.url.includes("googleapis.com") ||
-    event.request.url.includes("gstatic.com")
+    event.request.url.includes("gstatic.com") ||
+    event.request.url.startsWith("chrome-extension://") ||
+    event.request.url.startsWith("moz-extension://") ||
+    event.request.url.startsWith("safari-extension://")
   ) {
     return;
   }

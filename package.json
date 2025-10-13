@@ -22,7 +22,6 @@
   },
   "dependencies": {
     "@types/node": "^24.7.2",
-    "dexie": "^4.2.1",
     "firebase": "^12.4.0",
     "lucide-react": "^0.545.0",
     "react": "^19.2.0",

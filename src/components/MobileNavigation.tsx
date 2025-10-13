@@ -11,10 +11,14 @@ import {
   Menu,
   X
 } from 'lucide-react';
+import { UserHeader } from './auth/UserHeader';
+import type { UserProfile } from '../firebase/auth';
 
 interface MobileNavigationProps {
   currentView: string;
   onViewChange: (view: string) => void;
+  userProfile?: UserProfile | null;
+  onLogout?: () => void;
 }
 
 const navItems = [
@@ -26,7 +30,7 @@ const navItems = [
   { id: 'assurances', label: 'Documents', icon: Shield },
 ];
 
-export function MobileNavigation({ currentView, onViewChange }: MobileNavigationProps) {
+export function MobileNavigation({ currentView, onViewChange, userProfile, onLogout }: MobileNavigationProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleViewChange = (view: string) => {
@@ -72,6 +76,13 @@ export function MobileNavigation({ currentView, onViewChange }: MobileNavigation
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {/* En-tête utilisateur mobile */}
+            {userProfile && onLogout && (
+              <div className="mb-6 pb-4 border-b border-gray-700">
+                <UserHeader userProfile={userProfile} onLogout={onLogout} />
+              </div>
+            )}
 
             <nav className="space-y-2">
               {navItems.map((item) => {

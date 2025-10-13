@@ -1,21 +1,18 @@
 # Suivi de Chantier
 
-Application moderne de suivi et gestion de chantier développée avec React, TypeScript et Tailwind CSS.
+Application complète de suivi et gestion de chantier développée avec React, TypeScript, Tailwind CSS et Firebase.
 
-## 🚀 Fonctionnalités
+## 🚀 Fonctionnalités complètes
 
-### ✅ Modules terminés
+### ✅ Application 100% fonctionnelle
 
 - **Dashboard** - Vue d'ensemble avec statistiques et activité récente
-- **Gestion des Entreprises** - CRUD complet des entreprises partenaires par secteur
-- **Gestion des Prestations** - Création et suivi des prestations par corps de métier
-- **Planning des Travaux** - Planification avec gestion des dépendances entre métiers
-- **Interface Mobile-First** - Navigation optimisée pour mobile et desktop
-
-### 🔄 Modules en développement
-
-- **Gestion des Devis** - Upload PDF/Word, validation/refus, dates
-- **Gestion des Paiements** - Acomptes, situations, paiement final
+- **Entreprises** - CRUD complet avec devis, commandes et paiements intégrés par entreprise
+- **Prestations** - Vue intelligente avec statuts automatiques basés sur l'avancement
+- **Planning** - Calendrier avec vues mois/semaine/jour/agenda et gestion des rendez-vous
+- **Paiements** - Tableau global de tous les paiements avec budget prévisionnel évolutif
+- **Documents** - Gestion des assurances, garanties et documents officiels avec alertes d'expiration
+- **PWA** - Application installable avec mode hors ligne
 
 ### 🏗️ Architecture
 
@@ -29,9 +26,18 @@ Application moderne de suivi et gestion de chantier développée avec React, Typ
 
 **Base de données :**
 
-- IndexedDB via Dexie pour stockage local
-- Données persistantes côté client
-- Données de test pré-chargées
+- Firebase Firestore pour les données
+- Firebase Storage pour les fichiers (PDF, Word, Images)
+- Collections organisées par entreprise avec sous-collections
+
+**Workflow complet :**
+
+1. **Entreprises** → Créer et gérer les partenaires
+2. **Documents** → Upload assurances, garanties, certifications
+3. **Devis** → Recevoir et stocker les devis PDF/Word
+4. **Commandes** → Transformer devis validés en commandes + devis signés
+5. **Planning** → Calendrier des interventions + rendez-vous
+6. **Paiements** → Suivi global acomptes/situations/solde + budget prévisionnel
 
 ## 🛠️ Installation
 
@@ -42,6 +48,9 @@ cd SuiviDeChantier
 
 # Installer les dépendances
 npm install
+
+# Configurer Firebase (optionnel)
+# Copier .env.local.example vers .env.local et remplir les variables
 
 # Lancer en mode développement
 npm run dev
@@ -54,29 +63,38 @@ npm run build
 
 ### Navigation
 
-- **Desktop** : Menu latéral fixe
+- **Desktop** : Menu latéral fixe avec profil utilisateur
 - **Mobile** : Menu hamburger avec overlay
 
-### Workflow type
+### Workflow par entreprise
 
-1. **Créer des entreprises** par secteur d'activité
-2. **Créer des prestations** et inviter les entreprises
-3. **Recevoir et valider les devis**
-4. **Créer des commandes** et gérer les paiements
-5. **Planifier les travaux** avec gestion des dépendances
+1. **Créer une entreprise** avec contact et secteur d'activité
+2. **Ajouter documents** (assurances, garanties) avec alertes d'expiration
+3. **Recevoir devis** avec upload PDF/Word et gestion des statuts
+4. **Créer commandes** depuis devis validés + upload devis signés
+5. **Gérer paiements** (acompte 30%, situation 40%, solde 30%)
+6. **Envoyer emails** avec contenu pré-formaté (Ionos, Gmail, Outlook)
 
-### Exemple de dépendances
+### Planning et calendrier
 
-- Le carreleur doit démonter avant que le plombier intervienne
-- Le plombier pose les conduites avant que le carreleur repose
-- Puis le plombier peut installer les équipements
+- **4 vues** : Mois, Semaine, Jour, Agenda
+- **Couleurs par secteur** : Identification visuelle des entreprises
+- **Événements automatiques** : Dates de début/fin des commandes
+- **Rendez-vous** : Création manuelle avec heures précises
+
+### Paiements globaux
+
+- **Tableau consolidé** : Tous paiements, toutes entreprises
+- **Budget prévisionnel** : Modifiable selon évolution du chantier
+- **Filtres avancés** : Statut, entreprise, type de paiement
+- **Alertes** : Paiements en retard automatiquement détectés
 
 ## 🎨 Design
 
 - **Mode sombre par défaut**
 - **Icônes monochromes** Lucide React
-- **Pas d'emojis** - design professionnel
-- **Modales personnalisées** au lieu d'alerts
+- **Design professionnel** sans emojis
+- **Modales personnalisées** (pas d'alerts)
 - **Responsive mobile-first**
 
 ## 🔧 Technologies
@@ -84,26 +102,28 @@ npm run build
 - **React 18** + TypeScript
 - **Vite** pour le build
 - **Tailwind CSS** pour le styling
-- **Dexie** pour IndexedDB
+- **Firebase Firestore** pour les données
+- **Firebase Storage** pour les fichiers
 - **Lucide React** pour les icônes
+- **PWA** avec Service Worker
 
-## 📊 Données de test
+## 📱 PWA (Progressive Web App)
 
-L'application se charge avec des données d'exemple :
+- **Installable** sur mobile et desktop
+- **Mode hors ligne** avec cache intelligent
+- **Icônes complètes** (16px à 512px)
+- **Manifest optimisé** pour l'installation
 
-- 5 entreprises (une par secteur)
-- 3 prestations en cours
-- Statistiques du dashboard
+## 🚀 Déploiement
 
-## 🚀 Prochaines étapes
+L'application est optimisée pour Vercel :
 
-1. Module de gestion des devis avec upload de fichiers
-2. Système de paiements complet
-3. Gestion des assurances d'entreprises
-4. Export/import de données
-5. Notifications et rappels
-6. Calendrier intégré pour les rendez-vous
+- **Build automatique** avec `npm run build`
+- **Variables d'environnement** Firebase configurables
+- **PWA** fonctionnelle en production
+- **Cache optimisé** pour les performances
 
 ---
 
-Développé par Christian avec Claude Sonnet 4 🤝
+**Application développée par Christian** 🏗️
+_Gestion complète de chantiers avec workflow professionnel_

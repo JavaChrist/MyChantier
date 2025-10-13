@@ -11,10 +11,14 @@ import {
   Download
 } from 'lucide-react';
 import { usePWA } from '../hooks/usePWA';
+import { UserHeader } from './auth/UserHeader';
+import type { UserProfile } from '../firebase/auth';
 
 interface NavigationProps {
   currentView: string;
   onViewChange: (view: string) => void;
+  userProfile?: UserProfile | null;
+  onLogout?: () => void;
 }
 
 const navItems = [
@@ -26,7 +30,7 @@ const navItems = [
   { id: 'assurances', label: 'Documents', icon: Shield },
 ];
 
-export function Navigation({ currentView, onViewChange }: NavigationProps) {
+export function Navigation({ currentView, onViewChange, userProfile, onLogout }: NavigationProps) {
   const { isInstallable, installApp } = usePWA();
 
   return (
@@ -63,6 +67,13 @@ export function Navigation({ currentView, onViewChange }: NavigationProps) {
           );
         })}
       </ul>
+
+      {/* En-tête utilisateur en bas */}
+      {userProfile && onLogout && (
+        <div className="mt-auto pt-4 border-t border-gray-700">
+          <UserHeader userProfile={userProfile} onLogout={onLogout} />
+        </div>
+      )}
     </nav>
   );
 }
