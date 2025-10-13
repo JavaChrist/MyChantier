@@ -388,185 +388,189 @@ function DevisForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-100">
-          {devis ? 'Modifier le devis' : 'Nouveau devis'}
-        </h3>
-      </div>
+    <div className="space-y-4">
+      <form id="devis-form" onSubmit={handleSubmit} className="space-y-4">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-100">
+            {devis ? 'Modifier le devis' : 'Nouveau devis'}
+          </h3>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Numéro de devis *
-          </label>
-          <input
-            type="text"
-            required
-            value={formData.numero}
-            onChange={(e) => setFormData(prev => ({ ...prev, numero: e.target.value }))}
-            className="input-field w-full"
-            placeholder="Ex: DEV-2024-001"
-          />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Numéro de devis *
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.numero}
+              onChange={(e) => setFormData(prev => ({ ...prev, numero: e.target.value }))}
+              className="input-field w-full"
+              placeholder="Ex: DEV-2024-001"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Prestation *
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.prestationNom}
+              onChange={(e) => setFormData(prev => ({ ...prev, prestationNom: e.target.value }))}
+              className="input-field w-full"
+              placeholder="Ex: Rénovation salle de bain"
+            />
+          </div>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
-            Prestation *
+            Description *
           </label>
-          <input
-            type="text"
+          <textarea
             required
-            value={formData.prestationNom}
-            onChange={(e) => setFormData(prev => ({ ...prev, prestationNom: e.target.value }))}
-            className="input-field w-full"
-            placeholder="Ex: Rénovation salle de bain"
+            value={formData.description}
+            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+            rows={3}
+            className="input-field w-full resize-none"
+            placeholder="Description détaillée des travaux..."
           />
         </div>
-      </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
-          Description *
-        </label>
-        <textarea
-          required
-          value={formData.description}
-          onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-          rows={3}
-          className="input-field w-full resize-none"
-          placeholder="Description détaillée des travaux..."
-        />
-      </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Montant HT (€) *
+            </label>
+            <input
+              type="number"
+              required
+              step="0.01"
+              value={formData.montantHT}
+              onChange={(e) => setFormData(prev => ({ ...prev, montantHT: e.target.value }))}
+              className="input-field w-full"
+              placeholder="8500.00"
+            />
+          </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Montant TTC (€) *
+            </label>
+            <input
+              type="number"
+              required
+              step="0.01"
+              value={formData.montantTTC}
+              onChange={(e) => setFormData(prev => ({ ...prev, montantTTC: e.target.value }))}
+              className="input-field w-full"
+              placeholder="10200.00"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Date de remise *
+            </label>
+            <input
+              type="date"
+              required
+              value={formData.dateRemise}
+              onChange={(e) => setFormData(prev => ({ ...prev, dateRemise: e.target.value }))}
+              className="input-field w-full"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Date de validité *
+            </label>
+            <input
+              type="date"
+              required
+              value={formData.dateValidite}
+              onChange={(e) => setFormData(prev => ({ ...prev, dateValidite: e.target.value }))}
+              className="input-field w-full"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Statut *
+            </label>
+            <select
+              required
+              value={formData.statut}
+              onChange={(e) => setFormData(prev => ({ ...prev, statut: e.target.value as any }))}
+              className="input-field w-full"
+            >
+              <option value="en-attente">En attente</option>
+              <option value="valide">Validé</option>
+              <option value="refuse">Refusé</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Upload de fichier */}
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
-            Montant HT (€) *
+            Fichier du devis
           </label>
-          <input
-            type="number"
-            required
-            step="0.01"
-            value={formData.montantHT}
-            onChange={(e) => setFormData(prev => ({ ...prev, montantHT: e.target.value }))}
-            className="input-field w-full"
-            placeholder="8500.00"
-          />
+          <div className="space-y-3">
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+              onChange={handleFileChange}
+              className="input-field w-full file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary-600 file:text-white file:cursor-pointer hover:file:bg-primary-700"
+            />
+            {selectedFile && (
+              <div className="flex items-center space-x-2 text-sm text-green-400">
+                <FileText className="w-4 h-4" />
+                <span>{selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)</span>
+              </div>
+            )}
+            {devis?.fichierUrl && !selectedFile && (
+              <div className="flex items-center space-x-2 text-sm text-blue-400">
+                <FileText className="w-4 h-4" />
+                <span>Fichier existant attaché</span>
+                <a
+                  href={devis.fichierUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-300 hover:text-blue-200 underline"
+                >
+                  Voir
+                </a>
+              </div>
+            )}
+            <p className="text-xs text-gray-500">
+              Formats acceptés: PDF, Word (.doc, .docx), Images (JPEG, PNG). Taille max: 10MB
+            </p>
+          </div>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
-            Montant TTC (€) *
+            Notes
           </label>
-          <input
-            type="number"
-            required
-            step="0.01"
-            value={formData.montantTTC}
-            onChange={(e) => setFormData(prev => ({ ...prev, montantTTC: e.target.value }))}
-            className="input-field w-full"
-            placeholder="10200.00"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Date de remise *
-          </label>
-          <input
-            type="date"
-            required
-            value={formData.dateRemise}
-            onChange={(e) => setFormData(prev => ({ ...prev, dateRemise: e.target.value }))}
-            className="input-field w-full"
+          <textarea
+            value={formData.notes}
+            onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+            rows={2}
+            className="input-field w-full resize-none"
+            placeholder="Notes supplémentaires..."
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Date de validité *
-          </label>
-          <input
-            type="date"
-            required
-            value={formData.dateValidite}
-            onChange={(e) => setFormData(prev => ({ ...prev, dateValidite: e.target.value }))}
-            className="input-field w-full"
-          />
-        </div>
+      </form>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Statut *
-          </label>
-          <select
-            required
-            value={formData.statut}
-            onChange={(e) => setFormData(prev => ({ ...prev, statut: e.target.value as any }))}
-            className="input-field w-full"
-          >
-            <option value="en-attente">En attente</option>
-            <option value="valide">Validé</option>
-            <option value="refuse">Refusé</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Upload de fichier */}
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
-          Fichier du devis
-        </label>
-        <div className="space-y-3">
-          <input
-            type="file"
-            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-            onChange={handleFileChange}
-            className="input-field w-full file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary-600 file:text-white file:cursor-pointer hover:file:bg-primary-700"
-          />
-          {selectedFile && (
-            <div className="flex items-center space-x-2 text-sm text-green-400">
-              <FileText className="w-4 h-4" />
-              <span>{selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)</span>
-            </div>
-          )}
-          {devis?.fichierUrl && !selectedFile && (
-            <div className="flex items-center space-x-2 text-sm text-blue-400">
-              <FileText className="w-4 h-4" />
-              <span>Fichier existant attaché</span>
-              <a
-                href={devis.fichierUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-300 hover:text-blue-200 underline"
-              >
-                Voir
-              </a>
-            </div>
-          )}
-          <p className="text-xs text-gray-500">
-            Formats acceptés: PDF, Word (.doc, .docx), Images (JPEG, PNG). Taille max: 10MB
-          </p>
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
-          Notes
-        </label>
-        <textarea
-          value={formData.notes}
-          onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-          rows={2}
-          className="input-field w-full resize-none"
-          placeholder="Notes supplémentaires..."
-        />
-      </div>
-
-      <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-700">
+      {/* Actions - En dehors du scroll pour rester visibles */}
+      <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-700 bg-gray-800 sticky bottom-0">
         <button
           type="button"
           onClick={onCancel}
@@ -576,6 +580,7 @@ function DevisForm({
         </button>
         <button
           type="submit"
+          form="devis-form"
           disabled={uploading}
           className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
         >
@@ -583,6 +588,6 @@ function DevisForm({
           <span>{uploading ? 'Enregistrement...' : (devis ? 'Modifier' : 'Recevoir le devis')}</span>
         </button>
       </div>
-    </form>
+    </div>
   );
 }

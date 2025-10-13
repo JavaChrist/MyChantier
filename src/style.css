@@ -28,6 +28,16 @@
   .input-field {
     @apply bg-gray-800 border border-gray-600 text-gray-100 px-3 py-2 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm md:text-base;
   }
+  
+  /* Optimisation des selects */
+  select.input-field {
+    @apply pr-8;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 8px center;
+    background-repeat: no-repeat;
+    background-size: 16px 16px;
+    appearance: none;
+  }
 
   .modal {
     @apply fixed inset-0 z-50 flex items-center justify-center p-4;
@@ -38,7 +48,7 @@
   }
 
   .modal-content {
-    @apply bg-gray-800 border border-gray-600 rounded-lg p-4 md:p-6 max-w-md w-full relative z-10;
+    @apply bg-gray-800 border border-gray-600 rounded-lg p-3 md:p-6 w-full relative z-10 mx-4;
   }
 
   /* Classes utilitaires pour mobile */
@@ -61,5 +71,31 @@
   /* Amélioration des cartes sur mobile */
   .card-mobile {
     @apply bg-gray-800 border border-gray-700 rounded-lg p-3 md:p-4 lg:p-6;
+  }
+
+  /* Formulaires optimisés mobile */
+  .form-mobile {
+    @apply space-y-3 md:space-y-4;
+  }
+
+  .form-section {
+    @apply space-y-2 md:space-y-3;
+  }
+
+  .form-title {
+    @apply text-base md:text-lg font-medium text-gray-100;
+  }
+
+  .form-actions {
+    @apply flex items-center justify-end space-x-3 pt-3 md:pt-4 border-t border-gray-700 bg-gray-800 sticky bottom-0;
+  }
+
+  /* Grid responsive optimisé */
+  .form-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4;
+  }
+
+  .form-grid-3 {
+    @apply grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4;
   }
 }

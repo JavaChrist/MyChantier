@@ -261,7 +261,7 @@ export function CalendarPlanning() {
       <div className="card">
         {viewType === 'month' && <MonthView currentDate={currentDate} getEventsForDate={getEventsForDate} getEntrepriseCouleur={getEntrepriseCouleur} onDateClick={handleDateClick} onEventClick={handleEventClick} />}
         {viewType === 'week' && <WeekView currentDate={currentDate} getEventsForDate={getEventsForDate} getEntrepriseCouleur={getEntrepriseCouleur} onDateClick={handleDateClick} onEventClick={handleEventClick} />}
-        {viewType === 'day' && <DayView currentDate={currentDate} getEventsForDate={getEventsForDate} getEntrepriseCouleur={getEntrepriseCouleur} onDateClick={handleDateClick} onEventClick={handleEventClick} />}
+        {viewType === 'day' && <DayView currentDate={currentDate} getEventsForDate={getEventsForDate} getEntrepriseCouleur={getEntrepriseCouleur} onDateClick={handleDateClick} onEventClick={handleEventClick} entreprises={entreprises} />}
         {viewType === 'agenda' && <AgendaView rendezVous={rendezVous} commandes={commandes} entreprises={entreprises} getEntrepriseCouleur={getEntrepriseCouleur} onEventClick={handleEventClick} onDateClick={handleDateClick} />}
       </div>
 
@@ -443,7 +443,8 @@ function DayView({
   getEventsForDate,
   getEntrepriseCouleur,
   onDateClick,
-  onEventClick
+  onEventClick,
+  entreprises
 }: any) {
   const events = getEventsForDate(currentDate);
   const hours = Array.from({ length: 24 }, (_, i) => i);
@@ -596,131 +597,130 @@ function RendezVousForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="space-y-4">
+      <form id="rendez-vous-form" onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Titre du rendez-vous
+            </label>
+            <input
+              type="text"
+              value={formData.titre}
+              onChange={(e) => setFormData(prev => ({ ...prev, titre: e.target.value }))}
+              className="input-field w-full"
+              placeholder="Ex: Visite de chantier"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Entreprise
+            </label>
+            <select
+              value={formData.entrepriseId}
+              onChange={(e) => setFormData(prev => ({ ...prev, entrepriseId: e.target.value }))}
+              className="input-field w-full"
+            >
+              <option value="">Sélectionner une entreprise</option>
+              {entreprises.map(entreprise => (
+                <option key={entreprise.id} value={entreprise.id}>
+                  {entreprise.nom} ({entreprise.secteurActivite})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Date
+            </label>
+            <input
+              type="date"
+              value={formData.date}
+              onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+              className="input-field w-full"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Heure
+            </label>
+            <input
+              type="time"
+              value={formData.heure}
+              onChange={(e) => setFormData(prev => ({ ...prev, heure: e.target.value }))}
+              className="input-field w-full"
+            />
+          </div>
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
-            Titre du rendez-vous *
+            Lieu
           </label>
           <input
             type="text"
-            required
-            value={formData.titre}
-            onChange={(e) => setFormData(prev => ({ ...prev, titre: e.target.value }))}
+            value={formData.lieu}
+            onChange={(e) => setFormData(prev => ({ ...prev, lieu: e.target.value }))}
             className="input-field w-full"
-            placeholder="Ex: Visite de chantier"
+            placeholder="Ex: Adresse du chantier"
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Entreprise *
-          </label>
-          <select
-            required
-            value={formData.entrepriseId}
-            onChange={(e) => setFormData(prev => ({ ...prev, entrepriseId: e.target.value }))}
-            className="input-field w-full"
-          >
-            <option value="">Sélectionner une entreprise</option>
-            {entreprises.map(entreprise => (
-              <option key={entreprise.id} value={entreprise.id}>
-                {entreprise.nom} ({entreprise.secteurActivite})
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Type de rendez-vous
+            </label>
+            <select
+              value={formData.type}
+              onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as any }))}
+              className="input-field w-full"
+            >
+              <option value="visite-chantier">Visite de chantier</option>
+              <option value="remise-devis">Remise de devis</option>
+              <option value="reunion">Réunion</option>
+              <option value="autre">Autre</option>
+            </select>
+          </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Statut
+            </label>
+            <select
+              value={formData.statut}
+              onChange={(e) => setFormData(prev => ({ ...prev, statut: e.target.value as any }))}
+              className="input-field w-full"
+            >
+              <option value="planifie">Planifié</option>
+              <option value="realise">Réalisé</option>
+              <option value="annule">Annulé</option>
+            </select>
+          </div>
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
-            Date *
+            Notes
           </label>
-          <input
-            type="date"
-            required
-            value={formData.date}
-            onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-            className="input-field w-full"
+          <textarea
+            value={formData.notes}
+            onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+            rows={3}
+            className="input-field w-full resize-none"
+            placeholder="Notes sur le rendez-vous..."
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Heure *
-          </label>
-          <input
-            type="time"
-            required
-            value={formData.heure}
-            onChange={(e) => setFormData(prev => ({ ...prev, heure: e.target.value }))}
-            className="input-field w-full"
-          />
-        </div>
-      </div>
+      </form>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
-          Lieu *
-        </label>
-        <input
-          type="text"
-          required
-          value={formData.lieu}
-          onChange={(e) => setFormData(prev => ({ ...prev, lieu: e.target.value }))}
-          className="input-field w-full"
-          placeholder="Ex: Adresse du chantier"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Type de rendez-vous
-          </label>
-          <select
-            value={formData.type}
-            onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as any }))}
-            className="input-field w-full"
-          >
-            <option value="visite-chantier">Visite de chantier</option>
-            <option value="remise-devis">Remise de devis</option>
-            <option value="reunion">Réunion</option>
-            <option value="autre">Autre</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Statut
-          </label>
-          <select
-            value={formData.statut}
-            onChange={(e) => setFormData(prev => ({ ...prev, statut: e.target.value as any }))}
-            className="input-field w-full"
-          >
-            <option value="planifie">Planifié</option>
-            <option value="realise">Réalisé</option>
-            <option value="annule">Annulé</option>
-          </select>
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
-          Notes
-        </label>
-        <textarea
-          value={formData.notes}
-          onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-          rows={3}
-          className="input-field w-full resize-none"
-          placeholder="Notes sur le rendez-vous..."
-        />
-      </div>
-
-      <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-700">
+      {/* Actions - En dehors du scroll pour rester visibles */}
+      <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-700 bg-gray-800 sticky bottom-0">
         <button
           type="button"
           onClick={onCancel}
@@ -730,12 +730,13 @@ function RendezVousForm({
         </button>
         <button
           type="submit"
+          form="rendez-vous-form"
           className="btn-primary"
         >
           {rendezVous ? 'Modifier' : 'Créer'}
         </button>
       </div>
-    </form>
+    </div>
   );
 }
 

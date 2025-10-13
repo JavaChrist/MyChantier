@@ -643,10 +643,9 @@ function DocumentForm({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
-            Entreprise *
+            Entreprise
           </label>
           <select
-            required
             value={formData.entrepriseId}
             onChange={(e) => setFormData(prev => ({ ...prev, entrepriseId: e.target.value }))}
             className="input-field w-full"
@@ -662,10 +661,9 @@ function DocumentForm({
 
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
-            Type de document *
+            Type de document
           </label>
           <select
-            required
             value={formData.type}
             onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as any }))}
             className="input-field w-full"
@@ -682,11 +680,10 @@ function DocumentForm({
 
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-2">
-          Nom du document *
+          Nom du document
         </label>
         <input
           type="text"
-          required
           value={formData.nom}
           onChange={(e) => setFormData(prev => ({ ...prev, nom: e.target.value }))}
           className="input-field w-full"
@@ -707,33 +704,44 @@ function DocumentForm({
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            N° de police
-          </label>
-          <input
-            type="text"
-            value={formData.numeroPolice}
-            onChange={(e) => setFormData(prev => ({ ...prev, numeroPolice: e.target.value }))}
-            className="input-field w-full"
-            placeholder="Ex: RC-2024-123456"
-          />
-        </div>
+      {/* Champs spécifiques selon le type */}
+      {['assurance-rc', 'assurance-decennale'].includes(formData.type) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              N° de police
+            </label>
+            <input
+              type="text"
+              value={formData.numeroPolice}
+              onChange={(e) => setFormData(prev => ({ ...prev, numeroPolice: e.target.value }))}
+              className="input-field w-full"
+              placeholder="Ex: RC-2024-123456"
+            />
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Compagnie d'assurance
-          </label>
-          <input
-            type="text"
-            value={formData.compagnieAssurance}
-            onChange={(e) => setFormData(prev => ({ ...prev, compagnieAssurance: e.target.value }))}
-            className="input-field w-full"
-            placeholder="Ex: AXA, Allianz..."
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Compagnie d'assurance
+            </label>
+            <input
+              type="text"
+              value={formData.compagnieAssurance}
+              onChange={(e) => setFormData(prev => ({ ...prev, compagnieAssurance: e.target.value }))}
+              className="input-field w-full"
+              placeholder="Ex: AXA, Allianz..."
+            />
+          </div>
         </div>
-      </div>
+      )}
+
+      {formData.type === 'kbis' && (
+        <div className="bg-blue-600/10 border border-blue-600/20 rounded-lg p-3">
+          <p className="text-blue-400 text-sm">
+            📋 Document KBIS : Extrait d'immatriculation au registre du commerce
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>

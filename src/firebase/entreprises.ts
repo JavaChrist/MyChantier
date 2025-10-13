@@ -15,6 +15,7 @@ import { db } from './config';
 export interface Entreprise {
   id?: string;
   nom: string;
+  siret?: string;
   secteurActivite: 'sanitaire' | 'electricite' | 'carrelage' | 'menuiserie' | 'peinture';
   contact: {
     nom: string;

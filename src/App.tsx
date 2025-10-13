@@ -292,7 +292,7 @@ function App() {
   const renderContent = () => {
     switch (currentView) {
       case 'dashboard':
-        return <Dashboard />;
+        return <Dashboard onNavigate={setCurrentView} />;
       case 'entreprises':
         return <EntreprisesManager />;
       case 'prestations':

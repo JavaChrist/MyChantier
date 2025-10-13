@@ -8,6 +8,15 @@ import { DevisManager } from './DevisManager';
 import { CommandesManager } from './CommandesManager';
 import { PaiementsManager } from './PaiementsManager';
 
+// Couleurs par secteur d'activité
+const COULEURS_SECTEURS = {
+  sanitaire: { bg: 'bg-blue-600', text: 'text-blue-100', border: 'border-blue-500' },
+  electricite: { bg: 'bg-yellow-600', text: 'text-yellow-100', border: 'border-yellow-500' },
+  carrelage: { bg: 'bg-green-600', text: 'text-green-100', border: 'border-green-500' },
+  menuiserie: { bg: 'bg-orange-600', text: 'text-orange-100', border: 'border-orange-500' },
+  peinture: { bg: 'bg-purple-600', text: 'text-purple-100', border: 'border-purple-500' }
+};
+
 export function EntreprisesManager() {
   const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,6 +118,10 @@ export function EntreprisesManager() {
     return secteurObj?.label || secteur;
   };
 
+  const getSecteurCouleur = (secteur: string) => {
+    return COULEURS_SECTEURS[secteur as keyof typeof COULEURS_SECTEURS] || COULEURS_SECTEURS.sanitaire;
+  };
+
   if (loading) {
     return (
       <div className="mobile-padding flex items-center justify-center min-h-64">
@@ -165,82 +178,120 @@ export function EntreprisesManager() {
         </div>
       </div>
 
+      {/* Légende des couleurs */}
+      <div className="card">
+        <h3 className="text-sm font-medium text-gray-100 mb-3">Couleurs par secteur :</h3>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {Object.entries(COULEURS_SECTEURS).map(([secteur, couleur]) => (
+            <div key={secteur} className="flex items-center space-x-2">
+              <div className={`w-4 h-4 rounded ${couleur.bg}`}></div>
+              <span className="text-sm text-gray-300 capitalize">{getSecteurLabel(secteur)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Liste des entreprises */}
       <div className="mobile-grid">
-        {filteredEntreprises.map((entreprise) => (
-          <div key={entreprise.id} className="card-mobile hover:bg-gray-750 transition-colors">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-primary-600 rounded-lg">
-                  <Building2 className="w-5 h-5 text-white" />
+        {filteredEntreprises.map((entreprise) => {
+          const couleur = getSecteurCouleur(entreprise.secteurActivite);
+          return (
+            <div
+              key={entreprise.id}
+              className={`card-mobile hover:bg-gray-750 transition-colors cursor-pointer border-l-4 ${couleur.border}`}
+              onClick={() => handleEditEntreprise(entreprise)}
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <div className={`p-2 rounded-lg ${couleur.bg}`}>
+                    <Building2 className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-100">{entreprise.nom}</h3>
+                    <p className="text-sm text-gray-400">{getSecteurLabel(entreprise.secteurActivite)}</p>
+                    {entreprise.siret && (
+                      <p className="text-xs text-gray-500">SIRET: {entreprise.siret}</p>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-gray-100">{entreprise.nom}</h3>
-                  <p className="text-sm text-gray-400">{getSecteurLabel(entreprise.secteurActivite)}</p>
+                <div className="flex space-x-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEditEntreprise(entreprise);
+                    }}
+                    className="p-1 text-gray-400 hover:text-gray-100 hover:bg-gray-700 rounded"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      entreprise.id && handleDeleteEntreprise(entreprise.id);
+                    }}
+                    className="p-1 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
-              <div className="flex space-x-1">
-                <button
-                  onClick={() => handleEditEntreprise(entreprise)}
-                  className="p-1 text-gray-400 hover:text-gray-100 hover:bg-gray-700 rounded"
-                >
-                  <Edit2 className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => entreprise.id && handleDeleteEntreprise(entreprise.id)}
-                  className="p-1 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2 text-sm">
-                <Phone className="w-4 h-4 text-gray-400" />
-                <span className="text-gray-300">{entreprise.contact.telephone}</span>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2 text-sm">
+                  <Phone className="w-4 h-4 text-gray-400" />
+                  <span className="text-gray-300">{entreprise.contact.telephone}</span>
+                </div>
+                <div className="flex items-center space-x-2 text-sm">
+                  <Mail className="w-4 h-4 text-gray-400" />
+                  <span className="text-gray-300">{entreprise.contact.email}</span>
+                </div>
+                <div className="text-sm text-gray-300">
+                  {entreprise.contact.nom}
+                </div>
               </div>
-              <div className="flex items-center space-x-2 text-sm">
-                <Mail className="w-4 h-4 text-gray-400" />
-                <span className="text-gray-300">{entreprise.contact.email}</span>
-              </div>
-              <div className="text-sm text-gray-300">
-                {entreprise.contact.nom}
-              </div>
-            </div>
 
-            {/* Actions rapides */}
-            <div className="mt-4 pt-4 border-t border-gray-700">
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => setShowDevis(entreprise.id || null)}
-                  className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded text-xs text-white transition-colors"
-                >
-                  <FileText className="w-3 h-3" />
-                  <span>Devis</span>
-                </button>
-                <button
-                  onClick={() => setShowCommandes(entreprise.id || null)}
-                  className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 bg-green-600 hover:bg-green-700 rounded text-xs text-white transition-colors"
-                >
-                  <ShoppingCart className="w-3 h-3" />
-                  <span>Commandes</span>
-                </button>
-                <button
-                  onClick={() => setShowPaiements(entreprise.id || null)}
-                  className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 bg-yellow-600 hover:bg-yellow-700 rounded text-xs text-white transition-colors"
-                >
-                  <CreditCard className="w-3 h-3" />
-                  <span>Paiements</span>
-                </button>
+              {/* Actions rapides */}
+              <div className="mt-4 pt-4 border-t border-gray-700">
+                <div className="flex space-x-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowDevis(entreprise.id || null);
+                    }}
+                    className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded text-xs text-white transition-colors"
+                  >
+                    <FileText className="w-3 h-3" />
+                    <span>Devis</span>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowCommandes(entreprise.id || null);
+                    }}
+                    className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 bg-green-600 hover:bg-green-700 rounded text-xs text-white transition-colors"
+                  >
+                    <ShoppingCart className="w-3 h-3" />
+                    <span>Commandes</span>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowPaiements(entreprise.id || null);
+                    }}
+                    className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 bg-yellow-600 hover:bg-yellow-700 rounded text-xs text-white transition-colors"
+                  >
+                    <CreditCard className="w-3 h-3" />
+                    <span>Paiements</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-3 text-xs text-gray-400">
+                Créée le {entreprise.dateCreation.toLocaleDateString()}
               </div>
             </div>
-
-            <div className="mt-3 text-xs text-gray-400">
-              Créée le {entreprise.dateCreation.toLocaleDateString()}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {filteredEntreprises.length === 0 && (
