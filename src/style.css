@@ -28,7 +28,7 @@
   .input-field {
     @apply bg-gray-800 border border-gray-600 text-gray-100 px-3 py-2 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors text-sm md:text-base;
   }
-  
+
   /* Optimisation des selects */
   select.input-field {
     @apply pr-8;
@@ -97,5 +97,19 @@
 
   .form-grid-3 {
     @apply grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4;
+  }
+
+  /* Inputs date/time optimisés mobile */
+  input[type="date"].input-field,
+  input[type="time"].input-field {
+    @apply w-full;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  /* Case à cocher personnalisée */
+  input[type="checkbox"] {
+    @apply accent-primary-600;
   }
 }

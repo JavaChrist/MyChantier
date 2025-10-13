@@ -125,10 +125,11 @@ export function CalendarPlanning() {
     // Ajouter les rendez-vous
     rendezVous.forEach(rdv => {
       if (rdv.dateHeure.toDateString() === dateStr) {
+        const confirmationIcon = rdv.confirme ? '✓ ' : '⏳ ';
         events.push({
           id: `rdv-${rdv.id}`,
           type: 'rendez-vous',
-          title: rdv.titre,
+          title: `${confirmationIcon}${rdv.titre}`,
           time: rdv.dateHeure.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
           entrepriseId: rdv.entrepriseId,
           data: rdv
@@ -163,15 +164,27 @@ export function CalendarPlanning() {
 
   const handleSaveEvent = async (eventData: Omit<RendezVous, 'id'>) => {
     try {
+      const finalEventData = {
+        ...eventData,
+        dateCreation: eventData.dateCreation || new Date(),
+        confirme: eventData.confirme || false
+      };
+
       if (selectedEvent?.id) {
-        await rendezVousService.update(selectedEvent.id, eventData);
+        await rendezVousService.update(selectedEvent.id, finalEventData);
       } else {
-        await rendezVousService.create(eventData);
+        await rendezVousService.create(finalEventData);
       }
       await loadData();
       setShowEventModal(false);
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
+      // En cas d'erreur de connexion, on ferme quand même la modale
+      // Les données seront synchronisées quand la connexion reviendra
+      if (error.message && error.message.includes('ERR_INTERNET_DISCONNECTED')) {
+        console.log('Sauvegarde en attente de connexion...');
+        setShowEventModal(false);
+      }
     }
   };
 
@@ -203,7 +216,8 @@ export function CalendarPlanning() {
 
       {/* Contrôles de navigation */}
       <div className="card">
-        <div className="flex items-center justify-between">
+        {/* Ligne 1: Navigation avec chevrons */}
+        <div className="flex items-center justify-between mb-4">
           <button
             onClick={() => navigateDate('prev')}
             className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
@@ -211,29 +225,12 @@ export function CalendarPlanning() {
             <ChevronLeft className="w-5 h-5 text-gray-400" />
           </button>
 
-          <div className="flex items-center space-x-4">
-            <h2 className="text-lg font-semibold text-gray-100">
-              {viewType === 'month' && currentDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
-              {viewType === 'week' && `Semaine du ${currentDate.toLocaleDateString('fr-FR')}`}
-              {viewType === 'day' && currentDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-              {viewType === 'agenda' && 'Agenda des rendez-vous'}
-            </h2>
-
-            <div className="flex bg-gray-700 rounded-lg p-1">
-              {(['month', 'week', 'day', 'agenda'] as ViewType[]).map(view => (
-                <button
-                  key={view}
-                  onClick={() => setViewType(view)}
-                  className={`px-2 py-1 rounded text-sm transition-colors ${viewType === view
-                    ? 'bg-primary-600 text-white'
-                    : 'text-gray-300 hover:text-gray-100'
-                    }`}
-                >
-                  {view === 'month' ? 'Mois' : view === 'week' ? 'Semaine' : view === 'day' ? 'Jour' : 'Agenda'}
-                </button>
-              ))}
-            </div>
-          </div>
+          <h2 className="text-lg md:text-xl font-semibold text-gray-100 text-center">
+            {viewType === 'month' && currentDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+            {viewType === 'week' && `Semaine du ${currentDate.toLocaleDateString('fr-FR')}`}
+            {viewType === 'day' && currentDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            {viewType === 'agenda' && 'Agenda des rendez-vous'}
+          </h2>
 
           <button
             onClick={() => navigateDate('next')}
@@ -241,6 +238,24 @@ export function CalendarPlanning() {
           >
             <ChevronRight className="w-5 h-5 text-gray-400" />
           </button>
+        </div>
+
+        {/* Ligne 2: Boutons de vue */}
+        <div className="flex justify-center">
+          <div className="flex bg-gray-700 rounded-lg p-1 w-full max-w-md">
+            {(['month', 'week', 'day', 'agenda'] as ViewType[]).map(view => (
+              <button
+                key={view}
+                onClick={() => setViewType(view)}
+                className={`flex-1 px-3 py-2 rounded text-sm transition-colors ${viewType === view
+                  ? 'bg-primary-600 text-white'
+                  : 'text-gray-300 hover:text-gray-100'
+                  }`}
+              >
+                {view === 'month' ? 'Mois' : view === 'week' ? 'Semaine' : view === 'day' ? 'Jour' : 'Agenda'}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -556,7 +571,8 @@ function RendezVousForm({
     lieu: '',
     type: 'visite-chantier' as const,
     notes: '',
-    statut: 'planifie' as const
+    statut: 'planifie' as const,
+    confirme: false
   });
 
   useEffect(() => {
@@ -569,7 +585,8 @@ function RendezVousForm({
         lieu: rendezVous.lieu,
         type: rendezVous.type,
         notes: rendezVous.notes || '',
-        statut: rendezVous.statut
+        statut: rendezVous.statut,
+        confirme: rendezVous.confirme || false
       });
     } else if (selectedDate) {
       setFormData(prev => ({
@@ -592,7 +609,8 @@ function RendezVousForm({
       lieu: formData.lieu,
       type: formData.type,
       notes: formData.notes,
-      statut: formData.statut
+      statut: formData.statut,
+      confirme: formData.confirme
     });
   };
 
@@ -642,6 +660,7 @@ function RendezVousForm({
               value={formData.date}
               onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
               className="input-field w-full"
+              style={{ maxWidth: '100%', minWidth: '0' }}
             />
           </div>
 
@@ -654,6 +673,7 @@ function RendezVousForm({
               value={formData.heure}
               onChange={(e) => setFormData(prev => ({ ...prev, heure: e.target.value }))}
               className="input-field w-full"
+              style={{ maxWidth: '100%', minWidth: '0' }}
             />
           </div>
         </div>
@@ -702,6 +722,26 @@ function RendezVousForm({
               <option value="annule">Annulé</option>
             </select>
           </div>
+        </div>
+
+        {/* Case à cocher confirmation */}
+        <div className="flex items-center space-x-3 p-3 bg-gray-700 rounded-lg">
+          <input
+            type="checkbox"
+            id="confirme"
+            checked={formData.confirme}
+            onChange={(e) => setFormData(prev => ({ ...prev, confirme: e.target.checked }))}
+            className="w-4 h-4 text-primary-600 bg-gray-800 border-gray-600 rounded focus:ring-primary-500 focus:ring-2"
+          />
+          <label htmlFor="confirme" className="text-sm text-gray-300 cursor-pointer">
+            Rendez-vous confirmé par l'entreprise
+          </label>
+          {formData.confirme && (
+            <div className="text-xs text-green-400 flex items-center space-x-1">
+              <CheckCircle className="w-3 h-3" />
+              <span>Confirmé</span>
+            </div>
+          )}
         </div>
 
         <div>

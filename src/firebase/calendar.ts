@@ -21,6 +21,7 @@ export interface RendezVous {
   type: 'visite-chantier' | 'remise-devis' | 'reunion' | 'autre';
   notes?: string;
   statut: 'planifie' | 'realise' | 'annule';
+  confirme: boolean;
   dateCreation: Date;
 }
 
@@ -30,12 +31,16 @@ export const rendezVousService = {
   async getAll(): Promise<RendezVous[]> {
     const q = query(collection(db, 'rendezVous'), orderBy('dateHeure', 'asc'));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      dateHeure: doc.data().dateHeure.toDate(),
-      dateCreation: doc.data().dateCreation.toDate()
-    } as RendezVous));
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        dateHeure: data.dateHeure.toDate(),
+        dateCreation: data.dateCreation.toDate(),
+        confirme: data.confirme || false // Rétrocompatibilité
+      } as RendezVous;
+    });
   },
 
   // Récupérer les rendez-vous d'une entreprise
@@ -46,12 +51,16 @@ export const rendezVousService = {
       orderBy('dateHeure', 'asc')
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      dateHeure: doc.data().dateHeure.toDate(),
-      dateCreation: doc.data().dateCreation.toDate()
-    } as RendezVous));
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        dateHeure: data.dateHeure.toDate(),
+        dateCreation: data.dateCreation.toDate(),
+        confirme: data.confirme || false // Rétrocompatibilité
+      } as RendezVous;
+    });
   },
 
   // Récupérer les rendez-vous d'une période
@@ -63,12 +72,16 @@ export const rendezVousService = {
       orderBy('dateHeure', 'asc')
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      dateHeure: doc.data().dateHeure.toDate(),
-      dateCreation: doc.data().dateCreation.toDate()
-    } as RendezVous));
+    return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        dateHeure: data.dateHeure.toDate(),
+        dateCreation: data.dateCreation.toDate(),
+        confirme: data.confirme || false // Rétrocompatibilité
+      } as RendezVous;
+    });
   },
 
   // Créer un nouveau rendez-vous
