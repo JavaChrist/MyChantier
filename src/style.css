@@ -93,6 +93,12 @@
   /* Grid responsive optimisé */
   .form-grid {
     @apply grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4;
+    overflow: hidden; /* Empêche le débordement */
+  }
+
+  .form-grid > div {
+    min-width: 0; /* Permet au contenu de se rétrécir */
+    overflow: hidden;
   }
 
   .form-grid-3 {
@@ -103,9 +109,25 @@
   input[type="date"].input-field,
   input[type="time"].input-field {
     @apply w-full;
-    max-width: 100%;
-    min-width: 0;
-    box-sizing: border-box;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+  }
+
+  /* Spécifique pour iPhone/Safari */
+  @media screen and (-webkit-min-device-pixel-ratio: 2) {
+    input[type="date"].input-field,
+    input[type="time"].input-field {
+      font-size: 14px !important;
+      padding: 8px 12px !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      overflow: hidden;
+    }
   }
 
   /* Case à cocher personnalisée */

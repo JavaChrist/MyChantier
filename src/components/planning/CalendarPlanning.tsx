@@ -660,7 +660,14 @@ function RendezVousForm({
               value={formData.date}
               onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
               className="input-field w-full"
-              style={{ maxWidth: '100%', minWidth: '0' }}
+              style={{
+                maxWidth: '100%',
+                minWidth: '0',
+                width: '100%',
+                boxSizing: 'border-box',
+                WebkitAppearance: 'none',
+                fontSize: '14px'
+              }}
             />
           </div>
 
@@ -673,7 +680,14 @@ function RendezVousForm({
               value={formData.heure}
               onChange={(e) => setFormData(prev => ({ ...prev, heure: e.target.value }))}
               className="input-field w-full"
-              style={{ maxWidth: '100%', minWidth: '0' }}
+              style={{
+                maxWidth: '100%',
+                minWidth: '0',
+                width: '100%',
+                boxSizing: 'border-box',
+                WebkitAppearance: 'none',
+                fontSize: '14px'
+              }}
             />
           </div>
         </div>
