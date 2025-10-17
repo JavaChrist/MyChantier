@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { updateManager } from '../utils/updateManager';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -12,22 +13,8 @@ export function usePWA() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
-    // Enregistrer le Service Worker
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', async () => {
-        try {
-          const registration = await navigator.serviceWorker.register('/sw.js');
-          console.log('✅ Service Worker enregistré:', registration.scope);
-
-          // Vérifier les mises à jour
-          registration.addEventListener('updatefound', () => {
-            console.log('🔄 Mise à jour du Service Worker disponible');
-          });
-        } catch (error) {
-          console.error('❌ Erreur Service Worker:', error);
-        }
-      });
-    }
+    // Démarrer le gestionnaire de mises à jour
+    updateManager.startUpdateCheck();
 
     // Gérer l'événement d'installation PWA
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -69,6 +56,7 @@ export function usePWA() {
     window.addEventListener('offline', handleOffline);
 
     return () => {
+      updateManager.stopUpdateCheck();
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
       window.removeEventListener('online', handleOnline);

@@ -8,6 +8,7 @@ import { CalendarPlanning } from './components/planning/CalendarPlanning';
 import { PaiementsGlobaux } from './components/paiements/PaiementsGlobaux';
 import { AssurancesManager } from './components/assurances/AssurancesManager';
 import { PWAPrompt } from './components/PWAPrompt';
+import { UpdatePrompt } from './components/UpdatePrompt';
 
 // Types simplifiés
 interface Entreprise {
@@ -332,8 +333,9 @@ function App() {
         </main>
       </div>
 
-      {/* Composant PWA */}
+      {/* Composants PWA et mises à jour */}
       <PWAPrompt />
+      <UpdatePrompt />
     </div>
   );
 }

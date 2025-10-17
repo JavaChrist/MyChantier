@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Search, Users, Calendar, CheckCircle, Clock, AlertCircle, Building2 } from 'lucide-react';
 import { entreprisesService, devisService, commandesService } from '../../firebase/entreprises';
 import type { Entreprise, Devis, Commande } from '../../firebase/entreprises';
+import { Modal } from '../Modal';
+import { DevisManager } from '../entreprises/DevisManager';
 
 // Interface pour une prestation avec statut calculé
 interface PrestationWithStatus {
@@ -22,6 +24,8 @@ export function PrestationsManager() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSecteur, setSelectedSecteur] = useState<string>('all');
   const [selectedStatut, setSelectedStatut] = useState<string>('all');
+  const [showDevisModal, setShowDevisModal] = useState(false);
+  const [selectedEntrepriseForDevis, setSelectedEntrepriseForDevis] = useState<{ id: string; nom: string } | null>(null);
 
   const secteurs = [
     { value: 'all', label: 'Tous les secteurs' },
@@ -175,6 +179,11 @@ export function PrestationsManager() {
     }
   };
 
+  const handleVoirDevis = (entreprise: Entreprise) => {
+    setSelectedEntrepriseForDevis({ id: entreprise.id!, nom: entreprise.nom });
+    setShowDevisModal(true);
+  };
+
   if (loading) {
     return (
       <div className="mobile-padding flex items-center justify-center min-h-64">
@@ -307,21 +316,28 @@ export function PrestationsManager() {
                       <div key={entreprise.id} className="flex items-center justify-between text-xs bg-gray-700 px-2 py-1 rounded">
                         <span className="text-gray-300">{entreprise.nom}</span>
                         <div className="flex space-x-1">
-                          <span className={`px-1 rounded text-xs ${prestation.devis.some(d => d.entrepriseId === entreprise.id && d.statut === 'valide')
-                              ? 'bg-green-600 text-white'
-                              : prestation.devis.some(d => d.entrepriseId === entreprise.id)
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-600 text-gray-300'
-                            }`}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleVoirDevis(entreprise);
+                            }}
+                            className={`px-2 py-1 rounded text-xs transition-colors cursor-pointer hover:opacity-80 ${prestation.devis.some(d => d.entrepriseId === entreprise.id && d.statut === 'valide')
+                                ? 'bg-green-600 text-white hover:bg-green-700'
+                                : prestation.devis.some(d => d.entrepriseId === entreprise.id)
+                                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                  : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                              }`}
+                            title="Voir les devis de cette entreprise"
+                          >
                             {prestation.devis.some(d => d.entrepriseId === entreprise.id && d.statut === 'valide')
-                              ? 'Validé'
+                              ? 'Voir validé'
                               : prestation.devis.some(d => d.entrepriseId === entreprise.id)
-                                ? 'Devis'
-                                : 'En attente'
+                                ? 'Voir devis'
+                                : 'Pas de devis'
                             }
-                          </span>
+                          </button>
                           {prestation.commandes.some(c => c.entrepriseId === entreprise.id) && (
-                            <span className="px-1 rounded text-xs bg-green-600 text-white">
+                            <span className="px-2 py-1 rounded text-xs bg-green-600 text-white">
                               Commandé
                             </span>
                           )}
@@ -417,6 +433,21 @@ export function PrestationsManager() {
           </div>
         </div>
       </div>
+
+      {/* Modal pour voir les devis d'une entreprise */}
+      {showDevisModal && selectedEntrepriseForDevis && (
+        <Modal
+          isOpen={true}
+          onClose={() => setShowDevisModal(false)}
+          title={`Devis - ${selectedEntrepriseForDevis.nom}`}
+          size="xl"
+        >
+          <DevisManager
+            entrepriseId={selectedEntrepriseForDevis.id}
+            entrepriseName={selectedEntrepriseForDevis.nom}
+          />
+        </Modal>
+      )}
     </div>
   );
 }
