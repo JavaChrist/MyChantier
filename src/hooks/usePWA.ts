@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { updateManager } from '../utils/updateManager';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
@@ -13,8 +12,7 @@ export function usePWA() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
-    // Démarrer le gestionnaire de mises à jour
-    updateManager.startUpdateCheck();
+    // Workbox gère automatiquement les mises à jour maintenant
 
     // Gérer l'événement d'installation PWA
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -56,7 +54,6 @@ export function usePWA() {
     window.addEventListener('offline', handleOffline);
 
     return () => {
-      updateManager.stopUpdateCheck();
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
       window.removeEventListener('online', handleOnline);

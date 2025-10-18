@@ -1,118 +1,90 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Download, X, AlertTriangle } from 'lucide-react';
-import { useRegisterSW } from 'virtual:pwa-register/react';
+import { Wifi, WifiOff, CheckCircle, RefreshCw } from 'lucide-react';
 
 export function UpdatePrompt() {
-  const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [showOfflineNotice, setShowOfflineNotice] = useState(false);
+  const [showUpdateSuccess, setShowUpdateSuccess] = useState(false);
 
-  const {
-    offlineReady: [offlineReady, setOfflineReady],
-    needRefresh: [needRefresh, setNeedRefresh],
-    updateServiceWorker,
-  } = useRegisterSW({
-    onRegistered(r) {
-      console.log('✅ Service Worker enregistré avec succès');
-
-      // Vérifier les mises à jour toutes les 30 secondes
-      if (r) {
-        setInterval(() => {
-          r.update();
-        }, 30000);
-      }
-    },
-    onRegisterError(error) {
-      console.error('❌ Erreur Service Worker:', error);
-    },
-    onOfflineReady() {
-      console.log('📴 Application prête pour le mode hors ligne');
-      setOfflineReady(true);
-    },
-    onNeedRefresh() {
-      console.log('🔄 Mise à jour disponible');
-      setNeedRefresh(true);
-      setShowUpdatePrompt(true);
-    },
-  });
-
-  const handleUpdate = () => {
-    updateServiceWorker(true);
-    setShowUpdatePrompt(false);
-  };
-
-  const handleDismiss = () => {
-    setShowUpdatePrompt(false);
-    setNeedRefresh(false);
-  };
-
-  // Auto-update après 10 secondes si l'utilisateur ne répond pas
   useEffect(() => {
-    if (needRefresh) {
-      const timer = setTimeout(() => {
-        console.log('🔄 Mise à jour automatique après 10 secondes');
-        updateServiceWorker(true);
-        setShowUpdatePrompt(false);
-      }, 10000);
+    // Gérer le statut en ligne/hors ligne
+    const handleOnline = () => {
+      setIsOnline(true);
+      setShowUpdateSuccess(true);
+      console.log('🌐 Connexion rétablie - Synchronisation en cours');
 
-      return () => clearTimeout(timer);
-    }
-  }, [needRefresh, updateServiceWorker]);
+      // Masquer le message après 3 secondes
+      setTimeout(() => setShowUpdateSuccess(false), 3000);
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      setShowOfflineNotice(true);
+      console.log('📴 Mode hors ligne');
+
+      // Masquer automatiquement après 5 secondes
+      setTimeout(() => setShowOfflineNotice(false), 5000);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   return (
     <>
-      {/* Notification de mise à jour disponible */}
-      {showUpdatePrompt && (
+      {/* Notification mode hors ligne */}
+      {showOfflineNotice && (
         <div className="fixed top-4 right-4 z-50 max-w-sm">
-          <div className="bg-primary-600 border border-primary-500 rounded-lg p-4 shadow-lg">
-            <div className="flex items-start space-x-3">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <RefreshCw className="w-5 h-5 text-white" />
-              </div>
+          <div className="bg-yellow-600 border border-yellow-500 rounded-lg p-3 shadow-lg">
+            <div className="flex items-center space-x-2">
+              <WifiOff className="w-5 h-5 text-yellow-100" />
               <div className="flex-1">
-                <h3 className="text-sm font-semibold text-white mb-1">
-                  Mise à jour disponible
-                </h3>
-                <p className="text-xs text-blue-100 mb-3">
-                  Une nouvelle version de l'application est disponible avec des améliorations et corrections.
+                <p className="text-sm font-medium text-yellow-100">
+                  Mode hors ligne
                 </p>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={handleUpdate}
-                    className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 bg-white hover:bg-gray-100 rounded text-xs text-primary-600 font-medium transition-colors"
-                  >
-                    <Download className="w-3 h-3" />
-                    <span>Mettre à jour</span>
-                  </button>
-                  <button
-                    onClick={handleDismiss}
-                    className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded transition-colors"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-                <div className="mt-2 text-xs text-blue-200">
-                  Mise à jour automatique dans 10 secondes...
-                </div>
+                <p className="text-xs text-yellow-200">
+                  Vos données seront synchronisées à la reconnexion
+                </p>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Notification mode hors ligne */}
-      {offlineReady && (
-        <div className="fixed bottom-4 left-4 z-40">
-          <div className="flex items-center space-x-2 px-3 py-2 bg-green-600/90 text-green-100 rounded-lg shadow-lg">
-            <AlertTriangle className="w-4 h-4" />
-            <span className="text-sm font-medium">Mode hors ligne activé</span>
-            <button
-              onClick={() => setOfflineReady(false)}
-              className="text-green-200 hover:text-white"
-            >
-              <X className="w-3 h-3" />
-            </button>
+      {/* Notification de reconnexion */}
+      {showUpdateSuccess && (
+        <div className="fixed top-4 right-4 z-50 max-w-sm">
+          <div className="bg-green-600 border border-green-500 rounded-lg p-3 shadow-lg">
+            <div className="flex items-center space-x-2">
+              <CheckCircle className="w-5 h-5 text-green-100" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-green-100">
+                  Synchronisé
+                </p>
+                <p className="text-xs text-green-200">
+                  Application mise à jour et synchronisée
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       )}
+
+      {/* Indicateur de statut de connexion (discret) */}
+      <div className="fixed bottom-4 left-4 z-40">
+        <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs transition-all ${isOnline
+            ? 'bg-green-600/20 text-green-400 border border-green-600/30'
+            : 'bg-red-600/20 text-red-400 border border-red-600/30'
+          }`}>
+          {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+          <span>{isOnline ? 'En ligne' : 'Hors ligne'}</span>
+        </div>
+      </div>
     </>
   );
 }
