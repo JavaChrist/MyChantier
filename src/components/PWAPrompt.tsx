@@ -96,26 +96,7 @@ export function PWAPrompt() {
         </div>
       )}
 
-      {/* Indicateur de statut en ligne (discret) */}
-      <div className="fixed bottom-4 left-4 z-40">
-        <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs transition-all ${isOnline
-            ? 'bg-green-600/20 text-green-400 border border-green-600/30'
-            : 'bg-red-600/20 text-red-400 border border-red-600/30'
-          }`}>
-          {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-          <span>{isOnline ? 'En ligne' : 'Hors ligne'}</span>
-        </div>
-      </div>
 
-      {/* Badge PWA installée (discret) */}
-      {isInstalled && (
-        <div className="fixed bottom-4 left-20 z-40">
-          <div className="flex items-center space-x-1 px-2 py-1 rounded-full text-xs bg-blue-600/20 text-blue-400 border border-blue-600/30">
-            <Smartphone className="w-3 h-3" />
-            <span>PWA</span>
-          </div>
-        </div>
-      )}
     </>
   );
 }

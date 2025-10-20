@@ -413,11 +413,10 @@ function DevisForm({
 
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
-              Prestation *
+              Prestation
             </label>
             <input
               type="text"
-              required
               value={formData.prestationNom}
               onChange={(e) => setFormData(prev => ({ ...prev, prestationNom: e.target.value }))}
               className="input-field w-full"
@@ -428,10 +427,9 @@ function DevisForm({
 
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
-            Description *
+            Description
           </label>
           <textarea
-            required
             value={formData.description}
             onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
             rows={3}

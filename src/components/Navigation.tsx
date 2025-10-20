@@ -8,7 +8,10 @@ import {
   CreditCard,
   Users,
   Shield,
-  Download
+  Download,
+  Wifi,
+  WifiOff,
+  Smartphone
 } from 'lucide-react';
 import { usePWA } from '../hooks/usePWA';
 import { UserHeader } from './auth/UserHeader';
@@ -31,7 +34,7 @@ const navItems = [
 ];
 
 export function Navigation({ currentView, onViewChange, userProfile, onLogout }: NavigationProps) {
-  const { isInstallable, installApp } = usePWA();
+  const { isInstallable, installApp, isInstalled, isOnline } = usePWA();
 
   return (
     <nav className="bg-gray-800 border-r border-gray-700 w-64 min-h-screen p-4">
@@ -68,12 +71,29 @@ export function Navigation({ currentView, onViewChange, userProfile, onLogout }:
         })}
       </ul>
 
-      {/* En-tête utilisateur en bas */}
-      {userProfile && onLogout && (
-        <div className="mt-auto pt-4 border-t border-gray-700">
-          <UserHeader userProfile={userProfile} onLogout={onLogout} />
+      {/* Badges de statut dans la sidebar */}
+      <div className="mt-auto pt-4 border-t border-gray-700 space-y-3">
+        {/* Badges côte à côte dans la sidebar */}
+        <div className="flex items-center space-x-2 w-full">
+          <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs flex-1 justify-center transition-all ${isOnline
+            ? 'bg-green-600/20 text-green-400 border border-green-600/30'
+            : 'bg-red-600/20 text-red-400 border border-red-600/30'
+            }`}>
+            {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+            <span>{isOnline ? 'En ligne' : 'Hors ligne'}</span>
+          </div>
+
+          <div className="flex items-center space-x-1 px-2 py-1 rounded-full text-xs bg-blue-600/20 text-blue-400 border border-blue-600/30">
+            <Smartphone className="w-3 h-3" />
+            <span>PWA</span>
+          </div>
         </div>
-      )}
+
+        {/* En-tête utilisateur */}
+        {userProfile && onLogout && (
+          <UserHeader userProfile={userProfile} onLogout={onLogout} />
+        )}
+      </div>
     </nav>
   );
 }
