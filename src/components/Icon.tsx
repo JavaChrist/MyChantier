@@ -63,9 +63,9 @@ export function Icon({ name, size = 24, className = '' }: IconProps) {
         ...iconStyle
       }}
       onError={(e) => {
-        console.error(`❌ Erreur chargement icône ${name}:`, iconSrc);
-        // Fallback vers une icône par défaut si erreur
-        (e.target as HTMLImageElement).src = '/logo32.png';
+        console.warn(`⚠️ Icône ${name} non disponible (mode hors ligne)`);
+        // Masquer l'image cassée
+        (e.target as HTMLImageElement).style.display = 'none';
       }}
     />
   );
@@ -96,9 +96,9 @@ export function AppIcon({ size = 48, className = '' }: { size?: number; classNam
       className={`inline-block ${className}`}
       style={{ objectFit: 'contain' }}
       onError={(e) => {
-        console.error(`❌ Erreur chargement AppIcon taille ${size}:`, getIconSize(size));
-        // Fallback vers logo32.png si erreur
-        (e.target as HTMLImageElement).src = '/logo32.png';
+        console.warn(`⚠️ Logo non disponible (mode hors ligne), utilisation fallback`);
+        // Masquer l'image cassée
+        (e.target as HTMLImageElement).style.display = 'none';
       }}
       onLoad={() => {
         console.log(`✅ AppIcon taille ${size} chargée`);

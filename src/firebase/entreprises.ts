@@ -76,7 +76,7 @@ export interface Paiement {
 
 // Fonctions CRUD pour les entreprises
 export const entreprisesService = {
-  // Récupérer toutes les entreprises
+  // Récupérer toutes les entreprises (ancien système - à garder pour migration)
   async getAll(): Promise<Entreprise[]> {
     const q = query(collection(db, 'entreprises'), orderBy('dateCreation', 'desc'));
     const snapshot = await getDocs(q);
@@ -124,6 +124,46 @@ export const entreprisesService = {
       dateCreation: Timestamp.fromDate(entreprise.dateCreation)
     });
     return docRef.id;
+  },
+
+  // NOUVELLES FONCTIONS PAR CHANTIER
+
+  // Récupérer les entreprises d'un chantier spécifique (nouvelle structure)
+  async getByChantierNew(chantierId: string): Promise<Entreprise[]> {
+    const q = query(
+      collection(db, `chantiers/${chantierId}/entreprises`),
+      orderBy('dateCreation', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      dateCreation: doc.data().dateCreation.toDate()
+    } as Entreprise));
+  },
+
+  // Créer une entreprise dans un chantier spécifique
+  async createInChantier(chantierId: string, entreprise: Omit<Entreprise, 'id'>): Promise<string> {
+    const docRef = await addDoc(collection(db, `chantiers/${chantierId}/entreprises`), {
+      ...entreprise,
+      dateCreation: Timestamp.fromDate(entreprise.dateCreation)
+    });
+    return docRef.id;
+  },
+
+  // Mettre à jour une entreprise dans un chantier
+  async updateInChantier(chantierId: string, entrepriseId: string, entreprise: Partial<Entreprise>): Promise<void> {
+    const docRef = doc(db, `chantiers/${chantierId}/entreprises`, entrepriseId);
+    const updateData: any = { ...entreprise };
+    if (updateData.dateCreation) {
+      updateData.dateCreation = Timestamp.fromDate(updateData.dateCreation);
+    }
+    await updateDoc(docRef, updateData);
+  },
+
+  // Supprimer une entreprise d'un chantier
+  async deleteInChantier(chantierId: string, entrepriseId: string): Promise<void> {
+    await deleteDoc(doc(db, `chantiers/${chantierId}/entreprises`, entrepriseId));
   },
 
   // Mettre à jour une entreprise

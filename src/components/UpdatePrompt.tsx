@@ -5,11 +5,32 @@ export function UpdatePrompt() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [showOfflineNotice, setShowOfflineNotice] = useState(false);
   const [showUpdateSuccess, setShowUpdateSuccess] = useState(false);
+  const [firebaseConnected, setFirebaseConnected] = useState(true);
 
   useEffect(() => {
+    // Test de connexion Firebase plus intelligent
+    const testFirebaseConnection = async () => {
+      try {
+        // Tester une requête Firebase simple
+        const response = await fetch('https://firestore.googleapis.com/', {
+          method: 'HEAD',
+          mode: 'no-cors'
+        });
+        setFirebaseConnected(true);
+        setIsOnline(true);
+      } catch (error) {
+        console.log('Firebase non accessible, mais peut-être en cache');
+        setFirebaseConnected(false);
+      }
+    };
+
+    // Tester la connexion au démarrage
+    testFirebaseConnection();
+
     // Gérer le statut en ligne/hors ligne
     const handleOnline = () => {
       setIsOnline(true);
+      setFirebaseConnected(true);
       setShowUpdateSuccess(true);
       console.log('🌐 Connexion rétablie - Synchronisation en cours');
 
@@ -18,12 +39,15 @@ export function UpdatePrompt() {
     };
 
     const handleOffline = () => {
-      setIsOnline(false);
-      setShowOfflineNotice(true);
-      console.log('📴 Mode hors ligne');
-
-      // Masquer automatiquement après 5 secondes
-      setTimeout(() => setShowOfflineNotice(false), 5000);
+      // Ne pas afficher "hors ligne" immédiatement, Firebase peut fonctionner en cache
+      setTimeout(() => {
+        if (!navigator.onLine) {
+          setIsOnline(false);
+          setShowOfflineNotice(true);
+          console.log('📴 Mode hors ligne confirmé');
+          setTimeout(() => setShowOfflineNotice(false), 5000);
+        }
+      }, 2000); // Attendre 2 secondes avant de confirmer
     };
 
     window.addEventListener('online', handleOnline);

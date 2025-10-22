@@ -34,7 +34,9 @@ export function Navigation({ currentView, onViewChange, userProfile, onLogout }:
     <nav className="bg-gray-800 border-r border-gray-700 w-64 min-h-screen p-4">
       <div className="mb-8">
         <div className="flex items-center space-x-3 mb-4">
-          <AppIcon size={40} />
+          <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center">
+            <span className="text-white font-bold text-lg">SC</span>
+          </div>
           <h1 className="text-xl font-bold text-gray-100">Suivi de Chantier</h1>
         </div>
         {isInstallable && (
@@ -74,12 +76,9 @@ export function Navigation({ currentView, onViewChange, userProfile, onLogout }:
       <div className="mt-auto pt-4 border-t border-gray-700 space-y-3">
         {/* Badges côte à côte dans la sidebar */}
         <div className="flex items-center space-x-2 w-full">
-          <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs flex-1 justify-center transition-all ${isOnline
-            ? 'bg-green-600/20 text-green-400 border border-green-600/30'
-            : 'bg-red-600/20 text-red-400 border border-red-600/30'
-            }`}>
-            {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-            <span>{isOnline ? 'En ligne' : 'Hors ligne'}</span>
+          <div className="flex items-center space-x-1 px-2 py-1 rounded-full text-xs flex-1 justify-center bg-green-600/20 text-green-400 border border-green-600/30">
+            <Wifi className="w-3 h-3" />
+            <span>Connecté</span>
           </div>
 
           <div className="flex items-center space-x-1 px-2 py-1 rounded-full text-xs bg-blue-600/20 text-blue-400 border border-blue-600/30">

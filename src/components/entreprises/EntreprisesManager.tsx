@@ -74,13 +74,28 @@ export function EntreprisesManager() {
 
       if (selectedEntreprise?.id) {
         // Mise à jour
-        await entreprisesService.update(selectedEntreprise.id, finalData);
+        if (chantierId === 'chantier-principal') {
+          // Ancien système pour le chantier principal
+          await entreprisesService.update(selectedEntreprise.id, finalData);
+        } else {
+          // Nouveau système pour les autres chantiers
+          await entreprisesService.updateInChantier(chantierId, selectedEntreprise.id, finalData);
+        }
       } else {
         // Création
-        await entreprisesService.create({
-          ...finalData,
-          dateCreation: new Date()
-        });
+        if (chantierId === 'chantier-principal') {
+          // Ancien système pour le chantier principal
+          await entreprisesService.create({
+            ...finalData,
+            dateCreation: new Date()
+          });
+        } else {
+          // Nouveau système pour les autres chantiers
+          await entreprisesService.createInChantier(chantierId, {
+            ...finalData,
+            dateCreation: new Date()
+          });
+        }
       }
       await reloadData();
       setIsModalOpen(false);

@@ -39,15 +39,13 @@ export function useChantierData(chantierId: string | null) {
       setLoading(true);
       setError(null);
 
-      // Chantier principal (tes données existantes réelles)
+      // Chargement selon le type de chantier
       if (chantierId === 'chantier-principal') {
-        // TES VRAIES DONNÉES EXISTANTES - à préserver
+        // CHANTIER PRINCIPAL = Anciennes données (structure globale)
         try {
-          // Charger toutes tes données existantes
-          const [
-            entreprisesData,
-            rendezVousData
-          ] = await Promise.all([
+          console.log('📊 Chargement données chantier principal (structure globale)');
+
+          const [entreprisesData, rendezVousData] = await Promise.all([
             entreprisesService.getAll(),
             rendezVousService.getAll()
           ]);
@@ -74,7 +72,6 @@ export function useChantierData(chantierId: string | null) {
             }
           }
 
-          // Assigner toutes les données
           setEntreprises(entreprisesData.map(ent => ({ ...ent, chantierId: 'chantier-principal' })));
           setDevis(tousDevis);
           setCommandes(toutesCommandes);
@@ -83,8 +80,7 @@ export function useChantierData(chantierId: string | null) {
           setRendezVous(rendezVousData);
 
         } catch (error) {
-          console.error('Erreur chargement données existantes:', error);
-          // Reset en cas d'erreur
+          console.error('Erreur chargement données chantier principal:', error);
           setEntreprises([]);
           setDevis([]);
           setCommandes([]);
@@ -93,14 +89,32 @@ export function useChantierData(chantierId: string | null) {
           setRendezVous([]);
         }
       } else {
-        // TOUS LES AUTRES CHANTIERS = VIERGES
-        console.log(`Chantier ${chantierId} : Données vierges`);
-        setEntreprises([]);
-        setDevis([]);
-        setCommandes([]);
-        setPaiements([]);
-        setDocuments([]);
-        setRendezVous([]);
+        // NOUVEAUX CHANTIERS = Structure par chantier
+        try {
+          console.log(`📊 Chargement données chantier ${chantierId} (structure par chantier)`);
+
+          // Essayer la nouvelle structure par chantier
+          const entreprisesData = await entreprisesService.getByChantierNew(chantierId);
+
+          // Pour l'instant, les nouveaux chantiers sont vierges
+          // Plus tard, on ajoutera les autres collections par chantier
+          setEntreprises(entreprisesData);
+          setDevis([]);
+          setCommandes([]);
+          setPaiements([]);
+          setDocuments([]);
+          setRendezVous([]);
+
+        } catch (error) {
+          console.error(`Erreur chargement chantier ${chantierId}:`, error);
+          // Chantier vierge en cas d'erreur
+          setEntreprises([]);
+          setDevis([]);
+          setCommandes([]);
+          setPaiements([]);
+          setDocuments([]);
+          setRendezVous([]);
+        }
       }
 
     } catch (error) {
