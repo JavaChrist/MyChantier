@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, Building2, Eye, Play, CheckCircle, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, Eye, Play, CheckCircle, Check } from 'lucide-react';
+import { Icon } from '../Icon';
 import { entreprisesService, commandesService } from '../../firebase/entreprises';
 import { rendezVousService } from '../../firebase/calendar';
+import { useChantier } from '../../contexts/ChantierContext';
+import { useChantierData } from '../../hooks/useChantierData';
 import type { Entreprise, Commande } from '../../firebase/entreprises';
 import type { RendezVous } from '../../firebase/calendar';
 import { Modal } from '../Modal';
@@ -18,50 +21,16 @@ const COULEURS_SECTEURS = {
 };
 
 export function CalendarPlanning() {
+  const { chantierId, chantierActuel } = useChantier();
+  const { entreprises, commandes, rendezVous, loading: dataLoading } = useChantierData(chantierId);
+
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewType, setViewType] = useState<ViewType>('month');
-  const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
-  const [commandes, setCommandes] = useState<Commande[]>([]);
-  const [rendezVous, setRendezVous] = useState<RendezVous[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showEventModal, setShowEventModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<RendezVous | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-
-      // Charger entreprises
-      const entreprisesData = await entreprisesService.getAll();
-      setEntreprises(entreprisesData);
-
-      // Charger toutes les commandes
-      const toutesCommandes: Commande[] = [];
-      for (const entreprise of entreprisesData) {
-        if (entreprise.id) {
-          const commandesEntreprise = await commandesService.getByEntreprise(entreprise.id);
-          toutesCommandes.push(...commandesEntreprise);
-        }
-      }
-      setCommandes(toutesCommandes);
-
-      // Charger les rendez-vous
-      const rendezVousData = await rendezVousService.getAll();
-      setRendezVous(rendezVousData);
-    } catch (error) {
-      console.error('Erreur lors du chargement:', error);
-      setEntreprises([]);
-      setCommandes([]);
-      setRendezVous([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Plus besoin de loadData car useChantierData s'en charge
 
   const navigateDate = (direction: 'prev' | 'next') => {
     const newDate = new Date(currentDate);
@@ -175,7 +144,7 @@ export function CalendarPlanning() {
       } else {
         await rendezVousService.create(finalEventData);
       }
-      await loadData();
+      // Les données se rechargent automatiquement via useChantierData
       setShowEventModal(false);
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
@@ -188,10 +157,12 @@ export function CalendarPlanning() {
     }
   };
 
-  if (loading) {
+  if (dataLoading) {
     return (
       <div className="mobile-padding flex items-center justify-center min-h-64">
-        <div className="text-gray-400">Chargement du calendrier...</div>
+        <div className="text-gray-400">
+          Chargement du planning {chantierActuel ? `du chantier "${chantierActuel.nom}"` : ''}...
+        </div>
       </div>
     );
   }
@@ -202,7 +173,12 @@ export function CalendarPlanning() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="mobile-header font-bold text-gray-100">Planning Calendrier</h1>
-          <p className="text-gray-400 mobile-text">Calendrier des commandes et rendez-vous</p>
+          <p className="text-gray-400 mobile-text">
+            {chantierActuel
+              ? `Planning du chantier "${chantierActuel.nom}"`
+              : 'Calendrier des commandes et rendez-vous'
+            }
+          </p>
         </div>
         <button
           onClick={() => handleDateClick(new Date())}
@@ -1068,7 +1044,7 @@ function AgendaView({
                 {event.lieu && (
                   <div className="mt-3 pt-3 border-t border-gray-600">
                     <div className="flex items-center space-x-2 text-sm">
-                      <Building2 className="w-4 h-4 text-gray-400" />
+                      <Icon name="planning" size={16} />
                       <span className="text-gray-300">{event.lieu}</span>
                     </div>
                   </div>

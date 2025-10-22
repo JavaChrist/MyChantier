@@ -1,17 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { Building2, FileText, ShoppingCart, Calendar, AlertCircle, CheckCircle, CreditCard, Clock, AlertTriangle } from 'lucide-react';
-import { entreprisesService, devisService, commandesService, paiementsService } from '../firebase/entreprises';
-import { documentsService } from '../firebase/documents';
-import { rendezVousService } from '../firebase/calendar';
-import type { Entreprise, Devis, Commande, Paiement } from '../firebase/entreprises';
-import type { DocumentOfficiel } from '../firebase/documents';
-import type { RendezVous } from '../firebase/calendar';
+import { useState, useEffect } from 'react';
+import { FileText, ShoppingCart, Calendar, AlertCircle, CheckCircle, CreditCard, Clock, AlertTriangle, Wrench } from 'lucide-react';
+import { ChantierChat } from './chat/ChantierChat';
+import { useChantier } from '../contexts/ChantierContext';
+import { useChantierData } from '../hooks/useChantierData';
 
 interface DashboardProps {
   onNavigate?: (view: string) => void;
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
+  const { chantierId, chantierActuel } = useChantier();
+  const {
+    entreprises,
+    devis,
+    commandes,
+    paiements,
+    documents,
+    rendezVous,
+    loading: dataLoading
+  } = useChantierData(chantierId);
+
   const [stats, setStats] = useState({
     entreprises: 0,
     devisEnAttente: 0,
@@ -29,46 +37,39 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     entrepriseNom?: string;
   }>>([]);
 
-  const [loading, setLoading] = useState(true);
-
+  // Recalculer les stats quand les données changent
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    if (!dataLoading && entreprises.length >= 0) {
+      calculateStats();
+    }
+  }, [entreprises, devis, commandes, paiements, documents, rendezVous, dataLoading]);
 
-  const loadDashboardData = async () => {
+  const calculateStats = () => {
     try {
-      setLoading(true);
-
-      // Charger toutes les données
-      const entreprises = await entreprisesService.getAll();
-
-      // Charger les rendez-vous
-      const rendezVous = await rendezVousService.getAll();
-
-      let tousDevis: (Devis & { entrepriseNom: string })[] = [];
-      let toutesCommandes: (Commande & { entrepriseNom: string })[] = [];
-      let tousPaiements: (Paiement & { entrepriseNom: string })[] = [];
-      let tousDocuments: (DocumentOfficiel & { entrepriseNom: string })[] = [];
-
-      // Charger les données pour chaque entreprise
-      for (const entreprise of entreprises) {
-        if (entreprise.id) {
-          const [devis, commandes, paiements, documents] = await Promise.all([
-            devisService.getByEntreprise(entreprise.id),
-            commandesService.getByEntreprise(entreprise.id),
-            paiementsService.getByEntreprise(entreprise.id),
-            documentsService.getByEntreprise(entreprise.id)
-          ]);
-
-          tousDevis.push(...devis.map(d => ({ ...d, entrepriseNom: entreprise.nom })));
-          toutesCommandes.push(...commandes.map(c => ({ ...c, entrepriseNom: entreprise.nom })));
-          tousPaiements.push(...paiements.map(p => ({ ...p, entrepriseNom: entreprise.nom })));
-          tousDocuments.push(...documents.map(doc => ({ ...doc, entrepriseNom: entreprise.nom })));
-        }
-      }
-
-      // Calculer les statistiques
+      // Calculer les statistiques avec les données du chantier actuel
       const maintenant = new Date();
+
+      // Ajouter nom entreprise aux données
+      const tousDevis = devis.map(d => ({
+        ...d,
+        entrepriseNom: entreprises.find(e => e.id === d.entrepriseId)?.nom || 'Entreprise inconnue'
+      }));
+
+      const toutesCommandes = commandes.map(c => ({
+        ...c,
+        entrepriseNom: entreprises.find(e => e.id === c.entrepriseId)?.nom || 'Entreprise inconnue'
+      }));
+
+      const tousPaiements = paiements.map(p => ({
+        ...p,
+        entrepriseNom: entreprises.find(e => e.id === p.entrepriseId)?.nom || 'Entreprise inconnue'
+      }));
+
+      const tousDocuments = documents.map(doc => ({
+        ...doc,
+        entrepriseNom: entreprises.find(e => e.id === doc.entrepriseId)?.nom || 'Entreprise inconnue'
+      }));
+
       const paiementsEnRetard = tousPaiements.filter(p =>
         p.statut === 'prevu' && p.datePrevue < maintenant
       ).length;
@@ -98,95 +99,34 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         rendezVousProchains
       });
 
-      // Créer l'activité récente (derniers 10 événements)
+      // Créer l'activité récente du chantier
       const activites: typeof recentActivity = [];
 
-      // Devis récents
-      tousDevis
-        .sort((a, b) => b.dateRemise.getTime() - a.dateRemise.getTime())
-        .slice(0, 3)
-        .forEach(devis => {
-          activites.push({
-            type: 'devis',
-            message: `Devis ${devis.statut} - ${devis.prestationNom}`,
-            date: devis.dateRemise.toLocaleDateString(),
-            entrepriseNom: devis.entrepriseNom
-          });
+      // Activité basée sur les données du chantier actuel
+      tousDevis.slice(0, 3).forEach(devis => {
+        activites.push({
+          type: 'devis',
+          message: `Devis ${devis.statut} - ${devis.prestationNom}`,
+          date: devis.dateRemise.toLocaleDateString(),
+          entrepriseNom: devis.entrepriseNom
         });
+      });
 
-      // Commandes récentes
-      toutesCommandes
-        .sort((a, b) => b.dateCommande.getTime() - a.dateCommande.getTime())
-        .slice(0, 3)
-        .forEach(commande => {
-          activites.push({
-            type: 'commande',
-            message: `Commande ${commande.statut} - ${commande.prestationNom}`,
-            date: commande.dateCommande.toLocaleDateString(),
-            entrepriseNom: commande.entrepriseNom
-          });
+      toutesCommandes.slice(0, 2).forEach(commande => {
+        activites.push({
+          type: 'commande',
+          message: `Commande ${commande.statut} - ${commande.prestationNom}`,
+          date: commande.dateCommande.toLocaleDateString(),
+          entrepriseNom: commande.entrepriseNom
         });
+      });
 
-      // Paiements récents
-      tousPaiements
-        .filter(p => p.dateReglement || p.datePrevue < new Date())
-        .sort((a, b) => {
-          const dateA = a.dateReglement || a.datePrevue;
-          const dateB = b.dateReglement || b.datePrevue;
-          return dateB.getTime() - dateA.getTime();
-        })
-        .slice(0, 2)
-        .forEach(paiement => {
-          const message = paiement.statut === 'regle'
-            ? `Paiement reçu (${paiement.type})`
-            : `Paiement en retard (${paiement.type})`;
-          const date = paiement.dateReglement || paiement.datePrevue;
-
-          activites.push({
-            type: 'paiement',
-            message,
-            date: date.toLocaleDateString(),
-            entrepriseNom: paiement.entrepriseNom
-          });
-        });
-
-      // Documents récents
-      tousDocuments
-        .sort((a, b) => b.dateUpload.getTime() - a.dateUpload.getTime())
-        .slice(0, 2)
-        .forEach(document => {
-          activites.push({
-            type: 'document',
-            message: `Document ajouté - ${document.nom}`,
-            date: document.dateUpload.toLocaleDateString(),
-            entrepriseNom: document.entrepriseNom
-          });
-        });
-
-      // Rendez-vous récents et à venir
-      rendezVous
-        .filter(rdv => rdv.statut === 'planifie' && rdv.dateHeure >= maintenant)
-        .sort((a, b) => a.dateHeure.getTime() - b.dateHeure.getTime())
-        .slice(0, 3)
-        .forEach(rdv => {
-          const entreprise = entreprises.find(e => e.id === rdv.entrepriseId);
-          activites.push({
-            type: 'rendez-vous',
-            message: `RDV prévu - ${rdv.titre}`,
-            date: rdv.dateHeure.toLocaleDateString(),
-            entrepriseNom: entreprise?.nom
-          });
-        });
-
-      // Trier toute l'activité par date et prendre les 8 plus récents
+      // Trier par date et prendre les plus récents
       activites.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      setRecentActivity(activites.slice(0, 8));
+      setRecentActivity(activites.slice(0, 6));
 
     } catch (error) {
-      console.error('Erreur lors du chargement du dashboard:', error);
-      // En cas d'erreur, garder les données par défaut
-    } finally {
-      setLoading(false);
+      console.error('Erreur calcul statistiques:', error);
     }
   };
 
@@ -217,10 +157,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     }
   };
 
-  if (loading) {
+  if (dataLoading) {
     return (
       <div className="mobile-padding flex items-center justify-center min-h-64">
-        <div className="text-gray-400">Chargement du dashboard...</div>
+        <div className="text-gray-400">
+          Chargement des données {chantierActuel ? `du chantier "${chantierActuel.nom}"` : ''}...
+        </div>
       </div>
     );
   }
@@ -230,7 +172,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     <div className="mobile-padding space-y-4 md:space-y-6">
       <div>
         <h1 className="mobile-header font-bold text-gray-100 mb-2">Dashboard</h1>
-        <p className="text-gray-400 mobile-text">Vue d'ensemble de vos chantiers</p>
+        <p className="text-gray-400 mobile-text">
+          {chantierActuel
+            ? `Vue d'ensemble du chantier "${chantierActuel.nom}"`
+            : 'Vue d\'ensemble de vos chantiers'
+          }
+        </p>
       </div>
 
       {/* Statistiques */}
@@ -241,7 +188,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         >
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-primary-600 rounded-lg">
-              <Building2 className="w-5 h-5 md:w-6 md:h-6 text-white" />
+              <Wrench className="w-5 h-5 md:w-6 md:h-6 text-white" />
             </div>
             <div>
               <p className="text-gray-400 text-xs md:text-sm">Entreprises</p>
@@ -382,6 +329,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Module de dialogue client */}
+      <div className="card">
+        <ChantierChat />
       </div>
     </div>
   );

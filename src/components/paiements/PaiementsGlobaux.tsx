@@ -2,16 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { Plus, CreditCard, Calendar, Euro, Check, X, AlertTriangle, Clock, DollarSign, TrendingUp, Edit2, Target } from 'lucide-react';
 import { entreprisesService, paiementsService } from '../../firebase/entreprises';
 import { budgetService } from '../../firebase/budget';
+import { useChantier } from '../../contexts/ChantierContext';
+import { useChantierData } from '../../hooks/useChantierData';
 import type { Entreprise, Paiement } from '../../firebase/entreprises';
 import type { BudgetPrevisionnel } from '../../firebase/budget';
 import { Modal } from '../Modal';
 import { ConfirmModal } from '../ConfirmModal';
 
 export function PaiementsGlobaux() {
+  const { chantierId, chantierActuel } = useChantier();
+  const { entreprises, paiements: paiementsData, loading: dataLoading } = useChantierData(chantierId);
+
   const [paiements, setPaiements] = useState<(Paiement & { entrepriseNom: string; secteur: string })[]>([]);
-  const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
   const [budgets, setBudgets] = useState<BudgetPrevisionnel[]>([]);
-  const [loading, setLoading] = useState(true);
   const [filterStatut, setFilterStatut] = useState<string>('all');
   const [filterEntreprise, setFilterEntreprise] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
@@ -19,47 +22,41 @@ export function PaiementsGlobaux() {
   const [selectedBudget, setSelectedBudget] = useState<BudgetPrevisionnel | null>(null);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (!dataLoading && entreprises.length >= 0) {
+      calculatePaiements();
+      loadBudgets();
+    }
+  }, [entreprises, paiementsData, dataLoading]);
 
-  const loadData = async () => {
+  const calculatePaiements = () => {
+    // Créer les paiements avec infos entreprises du chantier actuel
+    const paiementsAvecInfo = paiementsData.map(paiement => {
+      const entreprise = entreprises.find(e => e.id === paiement.entrepriseId);
+      return {
+        ...paiement,
+        entrepriseNom: entreprise?.nom || 'Entreprise inconnue',
+        secteur: entreprise?.secteurActivite || 'sanitaire'
+      };
+    });
+
+    // Trier par date prévue (plus récent en premier)
+    paiementsAvecInfo.sort((a, b) => b.datePrevue.getTime() - a.datePrevue.getTime());
+    setPaiements(paiementsAvecInfo);
+  };
+
+  const loadBudgets = async () => {
     try {
-      setLoading(true);
-
-      // Charger entreprises et budgets
-      const [entreprisesData, budgetsData] = await Promise.all([
-        entreprisesService.getAll(),
-        budgetService.getAll()
-      ]);
-
-      setEntreprises(entreprisesData);
-      setBudgets(budgetsData);
-
-      // Charger tous les paiements de toutes les entreprises
-      const tousPaiements: (Paiement & { entrepriseNom: string; secteur: string })[] = [];
-
-      for (const entreprise of entreprisesData) {
-        if (entreprise.id) {
-          const paiementsEntreprise = await paiementsService.getByEntreprise(entreprise.id);
-          const paiementsAvecInfo = paiementsEntreprise.map(paiement => ({
-            ...paiement,
-            entrepriseNom: entreprise.nom,
-            secteur: entreprise.secteurActivite
-          }));
-          tousPaiements.push(...paiementsAvecInfo);
-        }
+      if (chantierId === 'chantier-principal') {
+        // Charger les budgets existants seulement pour le chantier principal
+        const budgetsData = await budgetService.getAll();
+        setBudgets(budgetsData);
+      } else {
+        // Nouveaux chantiers = pas de budget pour l'instant
+        setBudgets([]);
       }
-
-      // Trier par date prévue (plus récent en premier)
-      tousPaiements.sort((a, b) => b.datePrevue.getTime() - a.datePrevue.getTime());
-      setPaiements(tousPaiements);
     } catch (error) {
-      console.error('Erreur lors du chargement:', error);
-      setPaiements([]);
-      setEntreprises([]);
+      console.error('Erreur chargement budgets:', error);
       setBudgets([]);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -146,10 +143,12 @@ export function PaiementsGlobaux() {
 
   const budgetActuel = budgets.find(b => b.statut === 'actif');
 
-  if (loading) {
+  if (dataLoading) {
     return (
       <div className="mobile-padding flex items-center justify-center min-h-64">
-        <div className="text-gray-400">Chargement des paiements...</div>
+        <div className="text-gray-400">
+          Chargement des paiements {chantierActuel ? `du chantier "${chantierActuel.nom}"` : ''}...
+        </div>
       </div>
     );
   }
@@ -159,7 +158,12 @@ export function PaiementsGlobaux() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="mobile-header font-bold text-gray-100">Gestion des Paiements</h1>
-          <p className="text-gray-400 mobile-text">Tableau de bord des paiements et budget prévisionnel</p>
+          <p className="text-gray-400 mobile-text">
+            {chantierActuel
+              ? `Paiements du chantier "${chantierActuel.nom}"`
+              : 'Tableau de bord des paiements et budget prévisionnel'
+            }
+          </p>
         </div>
         <button
           onClick={handleCreateBudget}
@@ -231,12 +235,17 @@ export function PaiementsGlobaux() {
         <div className="card">
           <div className="text-center py-6">
             <Target className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-400 mb-2">Aucun budget prévisionnel</h3>
+            <h3 className="text-lg font-medium text-gray-400 mb-2">
+              {chantierActuel ? `Aucun budget pour ${chantierActuel.nom}` : 'Aucun budget prévisionnel'}
+            </h3>
             <p className="text-gray-500 mb-4">
-              Créez un budget prévisionnel pour suivre vos dépenses
+              {chantierActuel
+                ? `Créez un budget prévisionnel spécifique pour le chantier "${chantierActuel.nom}"`
+                : 'Créez un budget prévisionnel pour suivre vos dépenses'
+              }
             </p>
             <button onClick={handleCreateBudget} className="btn-primary">
-              Créer un budget
+              Créer un budget pour ce chantier
             </button>
           </div>
         </div>
@@ -414,8 +423,8 @@ export function PaiementsGlobaux() {
                       </td>
                       <td className="p-3">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${paiement.type === 'acompte' ? 'bg-blue-600/20 text-blue-400' :
-                            paiement.type === 'situation' ? 'bg-orange-600/20 text-orange-400' :
-                              'bg-green-600/20 text-green-400'
+                          paiement.type === 'situation' ? 'bg-orange-600/20 text-orange-400' :
+                            'bg-green-600/20 text-green-400'
                           }`}>
                           {getTypeLabel(paiement.type)}
                         </span>
@@ -427,8 +436,8 @@ export function PaiementsGlobaux() {
                       </td>
                       <td className="p-3 text-center">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${paiement.statut === 'regle' ? 'bg-green-600/20 text-green-400' :
-                            isEnRetard ? 'bg-red-600/20 text-red-400' :
-                              'bg-yellow-600/20 text-yellow-400'
+                          isEnRetard ? 'bg-red-600/20 text-red-400' :
+                            'bg-yellow-600/20 text-yellow-400'
                           }`}>
                           {getStatutLabel(paiement.statut, paiement.datePrevue)}
                         </span>
@@ -675,8 +684,8 @@ function BudgetForm({
           <div className="flex items-center justify-between text-sm">
             <span className="text-blue-400">Total réparti :</span>
             <span className={`font-bold ${calculerTotal() === parseFloat(formData.montantActuel)
-                ? 'text-green-400'
-                : 'text-yellow-400'
+              ? 'text-green-400'
+              : 'text-yellow-400'
               }`}>
               {calculerTotal().toLocaleString()} €
             </span>

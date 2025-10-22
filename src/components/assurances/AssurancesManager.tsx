@@ -2,15 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Shield, FileText, Calendar, AlertTriangle, CheckCircle, Clock, Upload, Download, Eye, Edit2, Trash2, Building2 } from 'lucide-react';
 import { entreprisesService } from '../../firebase/entreprises';
 import { documentsService, uploadDocumentFile } from '../../firebase/documents';
+import { useChantier } from '../../contexts/ChantierContext';
+import { useChantierData } from '../../hooks/useChantierData';
 import type { Entreprise } from '../../firebase/entreprises';
 import type { DocumentOfficiel } from '../../firebase/documents';
 import { Modal } from '../Modal';
 import { ConfirmModal } from '../ConfirmModal';
 
 export function AssurancesManager() {
+  const { chantierId, chantierActuel } = useChantier();
+  const { entreprises, documents: documentsData, loading: dataLoading, reloadData } = useChantierData(chantierId);
+
   const [documents, setDocuments] = useState<(DocumentOfficiel & { entrepriseNom: string; secteur: string })[]>([]);
-  const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
-  const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<string>('all');
   const [filterStatut, setFilterStatut] = useState<string>('all');
   const [filterEntreprise, setFilterEntreprise] = useState<string>('all');
@@ -38,38 +41,28 @@ export function AssurancesManager() {
   ];
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (!dataLoading && entreprises.length >= 0) {
+      calculateDocuments();
+    }
+  }, [entreprises, documentsData, dataLoading]);
 
-  const loadData = async () => {
+  const calculateDocuments = () => {
     try {
-      setLoading(true);
-
-      const entreprisesData = await entreprisesService.getAll();
-      setEntreprises(entreprisesData);
-
-      // Charger tous les documents de toutes les entreprises
-      const tousDocuments: (DocumentOfficiel & { entrepriseNom: string; secteur: string })[] = [];
-
-      for (const entreprise of entreprisesData) {
-        if (entreprise.id) {
-          const documentsEntreprise = await documentsService.getByEntreprise(entreprise.id);
-          const documentsAvecInfo = documentsEntreprise.map(doc => {
-            // Calculer le statut automatiquement
-            const statutCalcule = documentsService.calculateStatut(doc);
-            return {
-              ...doc,
-              statut: statutCalcule,
-              entrepriseNom: entreprise.nom,
-              secteur: entreprise.secteurActivite
-            };
-          });
-          tousDocuments.push(...documentsAvecInfo);
-        }
-      }
+      // Créer les documents avec infos entreprises du chantier actuel
+      const documentsAvecInfo = documentsData.map(doc => {
+        const entreprise = entreprises.find(e => e.id === doc.entrepriseId);
+        // Calculer le statut automatiquement
+        const statutCalcule = documentsService.calculateStatut(doc);
+        return {
+          ...doc,
+          statut: statutCalcule,
+          entrepriseNom: entreprise?.nom || 'Entreprise inconnue',
+          secteur: entreprise?.secteurActivite || 'sanitaire'
+        };
+      });
 
       // Trier par date d'expiration (plus urgent en premier)
-      tousDocuments.sort((a, b) => {
+      documentsAvecInfo.sort((a, b) => {
         // Prioriser les documents qui expirent bientôt
         if (a.statut === 'expire' && b.statut !== 'expire') return -1;
         if (b.statut === 'expire' && a.statut !== 'expire') return 1;
@@ -84,13 +77,10 @@ export function AssurancesManager() {
         return b.dateUpload.getTime() - a.dateUpload.getTime();
       });
 
-      setDocuments(tousDocuments);
+      setDocuments(documentsAvecInfo);
     } catch (error) {
-      console.error('Erreur lors du chargement:', error);
+      console.error('Erreur calcul documents:', error);
       setDocuments([]);
-      setEntreprises([]);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -127,7 +117,7 @@ export function AssurancesManager() {
         await documentsService.create(documentData.entrepriseId || '', finalDocumentData);
       }
 
-      await loadData();
+      await reloadData();
       setShowDocumentModal(false);
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
@@ -144,7 +134,7 @@ export function AssurancesManager() {
     if (documentToDelete) {
       try {
         await documentsService.delete(documentToDelete.entrepriseId, documentToDelete.documentId);
-        await loadData();
+        await reloadData();
         setShowConfirmModal(false);
         setDocumentToDelete(null);
       } catch (error) {
@@ -210,10 +200,12 @@ export function AssurancesManager() {
     expires: documents.filter(d => d.statut === 'expire').length
   };
 
-  if (loading) {
+  if (dataLoading) {
     return (
       <div className="mobile-padding flex items-center justify-center min-h-64">
-        <div className="text-gray-400">Chargement des documents...</div>
+        <div className="text-gray-400">
+          Chargement des documents {chantierActuel ? `du chantier "${chantierActuel.nom}"` : ''}...
+        </div>
       </div>
     );
   }
@@ -223,7 +215,12 @@ export function AssurancesManager() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="mobile-header font-bold text-gray-100">Documents Officiels</h1>
-          <p className="text-gray-400 mobile-text">Assurances, garanties, certifications et documents des entreprises</p>
+          <p className="text-gray-400 mobile-text">
+            {chantierActuel
+              ? `Documents du chantier "${chantierActuel.nom}"`
+              : 'Assurances, garanties, certifications et documents des entreprises'
+            }
+          </p>
         </div>
         <button
           onClick={handleCreateDocument}

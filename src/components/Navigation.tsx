@@ -1,18 +1,12 @@
 import React from 'react';
 import {
-  Building2,
-  ClipboardList,
-  FileText,
-  ShoppingCart,
-  Calendar,
-  CreditCard,
-  Users,
-  Shield,
   Download,
   Wifi,
   WifiOff,
   Smartphone
 } from 'lucide-react';
+import { AppIcon } from './Icon';
+import { NavigationIcon } from './NavigationIcon';
 import { usePWA } from '../hooks/usePWA';
 import { UserHeader } from './auth/UserHeader';
 import type { UserProfile } from '../firebase/auth';
@@ -25,12 +19,12 @@ interface NavigationProps {
 }
 
 const navItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: ClipboardList },
-  { id: 'entreprises', label: 'Entreprises', icon: Building2 },
-  { id: 'prestations', label: 'Prestations', icon: Users },
-  { id: 'planning', label: 'Planning', icon: Calendar },
-  { id: 'paiements', label: 'Paiements', icon: CreditCard },
-  { id: 'assurances', label: 'Documents', icon: Shield },
+  { id: 'dashboard', label: 'Dashboard', iconType: 'dashboard' as const },
+  { id: 'entreprises', label: 'Entreprises', iconType: 'entreprises' as const },
+  { id: 'prestations', label: 'Prestations', iconType: 'prestations' as const },
+  { id: 'planning', label: 'Planning', iconType: 'planning' as const },
+  { id: 'paiements', label: 'Paiements', iconType: 'paiements' as const },
+  { id: 'assurances', label: 'Documents', iconType: 'documents' as const },
 ];
 
 export function Navigation({ currentView, onViewChange, userProfile, onLogout }: NavigationProps) {
@@ -39,7 +33,10 @@ export function Navigation({ currentView, onViewChange, userProfile, onLogout }:
   return (
     <nav className="bg-gray-800 border-r border-gray-700 w-64 min-h-screen p-4">
       <div className="mb-8">
-        <h1 className="text-xl font-bold text-gray-100">Suivi de Chantier</h1>
+        <div className="flex items-center space-x-3 mb-4">
+          <AppIcon size={40} />
+          <h1 className="text-xl font-bold text-gray-100">Suivi de Chantier</h1>
+        </div>
         {isInstallable && (
           <button
             onClick={installApp}
@@ -53,7 +50,6 @@ export function Navigation({ currentView, onViewChange, userProfile, onLogout }:
 
       <ul className="space-y-2">
         {navItems.map((item) => {
-          const Icon = item.icon;
           return (
             <li key={item.id}>
               <button
@@ -63,7 +59,10 @@ export function Navigation({ currentView, onViewChange, userProfile, onLogout }:
                   : 'text-gray-300 hover:bg-gray-700 hover:text-gray-100'
                   }`}
               >
-                <Icon className="w-5 h-5" />
+                <NavigationIcon
+                  type={item.iconType}
+                  isActive={currentView === item.id}
+                />
                 <span>{item.label}</span>
               </button>
             </li>

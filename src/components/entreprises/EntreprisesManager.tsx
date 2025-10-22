@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Building2, Phone, Mail, FileText, CreditCard, ShoppingCart, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Search, Phone, Mail, FileText, CreditCard, ShoppingCart, Edit2, Trash2, Wrench, Zap, Hammer, Paintbrush, DoorOpen } from 'lucide-react';
+import { Icon } from '../Icon';
 import { entreprisesService, devisService, commandesService, paiementsService } from '../../firebase/entreprises';
 import type { Entreprise, Devis, Commande, Paiement } from '../../firebase/entreprises';
+import { useChantier } from '../../contexts/ChantierContext';
+import { useChantierData } from '../../hooks/useChantierData';
 import { Modal } from '../Modal';
 import { EntrepriseForm } from './EntrepriseForm';
 import { DevisManager } from './DevisManager';
@@ -18,8 +21,9 @@ const COULEURS_SECTEURS = {
 };
 
 export function EntreprisesManager() {
-  const [entreprises, setEntreprises] = useState<Entreprise[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { chantierId, chantierActuel } = useChantier();
+  const { entreprises, loading, reloadData } = useChantierData(chantierId);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSecteur, setSelectedSecteur] = useState<string>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -37,32 +41,7 @@ export function EntreprisesManager() {
     { value: 'peinture', label: 'Peinture' }
   ];
 
-  useEffect(() => {
-    loadEntreprises();
-  }, []);
-
-  const loadEntreprises = async () => {
-    try {
-      setLoading(true);
-      const data = await entreprisesService.getAll();
-      setEntreprises(data);
-    } catch (error) {
-      console.error('Erreur lors du chargement des entreprises:', error);
-      // En cas d'erreur Firebase (pas de config), utiliser des données de test
-      setEntreprises([
-        {
-          id: '1',
-          nom: 'Plomberie Martin',
-          secteurActivite: 'sanitaire',
-          contact: { nom: 'Jean Martin', telephone: '01 23 45 67 89', email: 'contact@plomberie-martin.fr' },
-          adresse: { rue: '123 rue de la République', ville: 'Paris', codePostal: '75001' },
-          dateCreation: new Date('2024-01-01')
-        }
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Plus besoin de loadEntreprises car useChantierData s'en charge
 
   const filteredEntreprises = entreprises.filter(entreprise => {
     const matchesSearch = entreprise.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -83,17 +62,27 @@ export function EntreprisesManager() {
 
   const handleSaveEntreprise = async (entrepriseData: Omit<Entreprise, 'id' | 'dateCreation'>) => {
     try {
+      if (!chantierId) {
+        alert('Aucun chantier sélectionné');
+        return;
+      }
+
+      const finalData = {
+        ...entrepriseData,
+        chantierId // Ajouter automatiquement l'ID du chantier
+      };
+
       if (selectedEntreprise?.id) {
         // Mise à jour
-        await entreprisesService.update(selectedEntreprise.id, entrepriseData);
+        await entreprisesService.update(selectedEntreprise.id, finalData);
       } else {
         // Création
         await entreprisesService.create({
-          ...entrepriseData,
+          ...finalData,
           dateCreation: new Date()
         });
       }
-      await loadEntreprises();
+      await reloadData();
       setIsModalOpen(false);
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
@@ -105,7 +94,7 @@ export function EntreprisesManager() {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer cette entreprise ?')) {
       try {
         await entreprisesService.delete(id);
-        await loadEntreprises();
+        await reloadData();
       } catch (error) {
         console.error('Erreur lors de la suppression:', error);
         alert('Erreur lors de la suppression.');
@@ -122,6 +111,23 @@ export function EntreprisesManager() {
     return COULEURS_SECTEURS[secteur as keyof typeof COULEURS_SECTEURS] || COULEURS_SECTEURS.sanitaire;
   };
 
+  const getSecteurIcon = (secteur: string) => {
+    switch (secteur) {
+      case 'sanitaire':
+        return Wrench; // Plomberie
+      case 'electricite':
+        return Zap; // Électricité
+      case 'carrelage':
+        return Hammer; // Carrelage/Maçonnerie
+      case 'menuiserie':
+        return DoorOpen; // Menuiserie
+      case 'peinture':
+        return Paintbrush; // Peinture
+      default:
+        return Wrench;
+    }
+  };
+
   if (loading) {
     return (
       <div className="mobile-padding flex items-center justify-center min-h-64">
@@ -135,7 +141,9 @@ export function EntreprisesManager() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="mobile-header font-bold text-gray-100">Gestion des Entreprises</h1>
-          <p className="text-gray-400 mobile-text">Gérez vos entreprises partenaires et leurs informations</p>
+          <p className="text-gray-400 mobile-text">
+            {chantierActuel ? `Chantier: ${chantierActuel.nom}` : 'Gérez vos entreprises partenaires'}
+          </p>
         </div>
         <button
           onClick={handleAddEntreprise}
@@ -178,16 +186,21 @@ export function EntreprisesManager() {
         </div>
       </div>
 
-      {/* Légende des couleurs */}
+      {/* Légende des couleurs et icônes */}
       <div className="card">
-        <h3 className="text-sm font-medium text-gray-100 mb-3">Couleurs par secteur :</h3>
+        <h3 className="text-sm font-medium text-gray-100 mb-3">Couleurs et icônes par secteur :</h3>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          {Object.entries(COULEURS_SECTEURS).map(([secteur, couleur]) => (
-            <div key={secteur} className="flex items-center space-x-2">
-              <div className={`w-4 h-4 rounded ${couleur.bg}`}></div>
-              <span className="text-sm text-gray-300 capitalize">{getSecteurLabel(secteur)}</span>
-            </div>
-          ))}
+          {Object.entries(COULEURS_SECTEURS).map(([secteur, couleur]) => {
+            const SecteurIcon = getSecteurIcon(secteur);
+            return (
+              <div key={secteur} className="flex items-center space-x-2">
+                <div className={`p-1 rounded ${couleur.bg} flex items-center justify-center`}>
+                  <SecteurIcon className="w-3 h-3 text-white" />
+                </div>
+                <span className="text-sm text-gray-300 capitalize">{getSecteurLabel(secteur)}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -204,7 +217,10 @@ export function EntreprisesManager() {
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center space-x-3">
                   <div className={`p-2 rounded-lg ${couleur.bg}`}>
-                    <Building2 className="w-5 h-5 text-white" />
+                    {(() => {
+                      const SecteurIcon = getSecteurIcon(entreprise.secteurActivite);
+                      return <SecteurIcon className="w-5 h-5 text-white" />;
+                    })()}
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-100">{entreprise.nom}</h3>
@@ -296,17 +312,23 @@ export function EntreprisesManager() {
 
       {filteredEntreprises.length === 0 && (
         <div className="text-center py-12">
-          <Building2 className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-400 mb-2">Aucune entreprise trouvée</h3>
+          <div className="w-16 h-16 bg-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Wrench className="w-8 h-8 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-400 mb-2">
+            {chantierActuel ? `Aucune entreprise pour ${chantierActuel.nom}` : 'Aucune entreprise trouvée'}
+          </h3>
           <p className="text-gray-500 mb-6">
             {searchTerm || selectedSecteur !== 'all'
               ? 'Aucune entreprise ne correspond à vos critères de recherche'
-              : 'Commencez par ajouter votre première entreprise partenaire'
+              : chantierActuel
+                ? `Ajoutez les entreprises qui travailleront sur le chantier "${chantierActuel.nom}"`
+                : 'Commencez par ajouter votre première entreprise partenaire'
             }
           </p>
           {!searchTerm && selectedSecteur === 'all' && (
             <button onClick={handleAddEntreprise} className="btn-primary">
-              Ajouter une entreprise
+              Ajouter une entreprise pour ce chantier
             </button>
           )}
         </div>

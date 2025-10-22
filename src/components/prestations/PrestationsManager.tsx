@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Users, Calendar, CheckCircle, Clock, AlertCircle, Building2 } from 'lucide-react';
+import { Plus, Search, Users, Calendar, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { Icon } from '../Icon';
 import { entreprisesService, devisService, commandesService } from '../../firebase/entreprises';
 import type { Entreprise, Devis, Commande } from '../../firebase/entreprises';
+import { useChantier } from '../../contexts/ChantierContext';
+import { useChantierData } from '../../hooks/useChantierData';
 import { Modal } from '../Modal';
 import { DevisManager } from '../entreprises/DevisManager';
 
@@ -19,8 +22,10 @@ interface PrestationWithStatus {
 }
 
 export function PrestationsManager() {
+  const { chantierId, chantierActuel } = useChantier();
+  const { entreprises, devis, commandes, loading: dataLoading } = useChantierData(chantierId);
+
   const [prestations, setPrestations] = useState<PrestationWithStatus[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSecteur, setSelectedSecteur] = useState<string>('all');
   const [selectedStatut, setSelectedStatut] = useState<string>('all');
@@ -45,64 +50,58 @@ export function PrestationsManager() {
   ];
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (!dataLoading && entreprises.length >= 0) {
+      calculatePrestations();
+    }
+  }, [entreprises, devis, commandes, dataLoading]);
 
-  const loadData = async () => {
+  const calculatePrestations = () => {
     try {
-      setLoading(true);
-
-      // Charger toutes les entreprises
-      const entreprises = await entreprisesService.getAll();
-
-      // Charger tous les devis et commandes pour chaque entreprise
+      // Créer les prestations basées sur les données du chantier actuel
       const prestationsMap = new Map<string, PrestationWithStatus>();
 
-      for (const entreprise of entreprises) {
-        if (!entreprise.id) continue;
+      // Grouper par prestation en utilisant les données filtrées
+      devis.forEach(devisItem => {
+        const entreprise = entreprises.find(e => e.id === devisItem.entrepriseId);
+        if (!entreprise) return;
 
-        const [devis, commandes] = await Promise.all([
-          devisService.getByEntreprise(entreprise.id),
-          commandesService.getByEntreprise(entreprise.id)
-        ]);
+        const prestationKey = `${devisItem.prestationNom}-${entreprise.secteurActivite}`;
 
-        // Grouper par prestation
-        devis.forEach(devis => {
-          const prestationKey = `${devis.prestationNom}-${entreprise.secteurActivite}`;
-
-          if (!prestationsMap.has(prestationKey)) {
-            prestationsMap.set(prestationKey, {
-              id: prestationKey,
-              nom: devis.prestationNom,
-              description: devis.description || '',
-              secteur: entreprise.secteurActivite,
-              entreprises: [entreprise],
-              statut: 'en-cours',
-              devis: [devis],
-              commandes: [],
-              dateCreation: devis.dateRemise
-            });
-          } else {
-            const prestation = prestationsMap.get(prestationKey)!;
-            prestation.devis.push(devis);
-            if (!prestation.entreprises.some(e => e.id === entreprise.id)) {
-              prestation.entreprises.push(entreprise);
-            }
+        if (!prestationsMap.has(prestationKey)) {
+          prestationsMap.set(prestationKey, {
+            id: prestationKey,
+            nom: devisItem.prestationNom,
+            description: devisItem.description || '',
+            secteur: entreprise.secteurActivite,
+            entreprises: [entreprise],
+            statut: 'en-cours',
+            devis: [devisItem],
+            commandes: [],
+            dateCreation: devisItem.dateRemise
+          });
+        } else {
+          const prestation = prestationsMap.get(prestationKey)!;
+          prestation.devis.push(devisItem);
+          if (!prestation.entreprises.some(e => e.id === entreprise.id)) {
+            prestation.entreprises.push(entreprise);
           }
-        });
+        }
+      });
 
-        // Ajouter les commandes aux prestations correspondantes
-        commandes.forEach(commande => {
-          const devisOriginal = devis.find(d => d.id === commande.devisId);
-          if (devisOriginal) {
+      // Ajouter les commandes aux prestations correspondantes
+      commandes.forEach(commande => {
+        const devisOriginal = devis.find(d => d.id === commande.devisId);
+        if (devisOriginal) {
+          const entreprise = entreprises.find(e => e.id === commande.entrepriseId);
+          if (entreprise) {
             const prestationKey = `${devisOriginal.prestationNom}-${entreprise.secteurActivite}`;
             const prestation = prestationsMap.get(prestationKey);
             if (prestation) {
               prestation.commandes.push(commande);
             }
           }
-        });
-      }
+        }
+      });
 
       // Calculer les statuts automatiquement
       const prestationsArray = Array.from(prestationsMap.values()).map(prestation => {
@@ -112,10 +111,8 @@ export function PrestationsManager() {
 
       setPrestations(prestationsArray);
     } catch (error) {
-      console.error('Erreur lors du chargement:', error);
+      console.error('Erreur calcul prestations:', error);
       setPrestations([]);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -184,10 +181,12 @@ export function PrestationsManager() {
     setShowDevisModal(true);
   };
 
-  if (loading) {
+  if (dataLoading) {
     return (
       <div className="mobile-padding flex items-center justify-center min-h-64">
-        <div className="text-gray-400">Chargement des prestations...</div>
+        <div className="text-gray-400">
+          Chargement des prestations {chantierActuel ? `du chantier "${chantierActuel.nom}"` : ''}...
+        </div>
       </div>
     );
   }
@@ -197,7 +196,12 @@ export function PrestationsManager() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="mobile-header font-bold text-gray-100">Gestion des Prestations</h1>
-          <p className="text-gray-400 mobile-text">Vue d'ensemble de vos prestations par corps de métier</p>
+          <p className="text-gray-400 mobile-text">
+            {chantierActuel
+              ? `Prestations du chantier "${chantierActuel.nom}"`
+              : 'Vue d\'ensemble de vos prestations par corps de métier'
+            }
+          </p>
         </div>
       </div>
 
@@ -322,10 +326,10 @@ export function PrestationsManager() {
                               handleVoirDevis(entreprise);
                             }}
                             className={`px-2 py-1 rounded text-xs transition-colors cursor-pointer hover:opacity-80 ${prestation.devis.some(d => d.entrepriseId === entreprise.id && d.statut === 'valide')
-                                ? 'bg-green-600 text-white hover:bg-green-700'
-                                : prestation.devis.some(d => d.entrepriseId === entreprise.id)
-                                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                  : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                              ? 'bg-green-600 text-white hover:bg-green-700'
+                              : prestation.devis.some(d => d.entrepriseId === entreprise.id)
+                                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
                               }`}
                             title="Voir les devis de cette entreprise"
                           >
@@ -399,7 +403,7 @@ export function PrestationsManager() {
           </p>
           <div className="bg-blue-600/10 border border-blue-600/20 rounded-lg p-4 max-w-md mx-auto">
             <div className="flex items-center space-x-2 text-blue-400 mb-2">
-              <Building2 className="w-4 h-4" />
+              <Icon name="prestations" size={16} />
               <span className="text-sm font-medium">Comment créer une prestation ?</span>
             </div>
             <div className="text-xs text-gray-300 space-y-1">

@@ -27,6 +27,7 @@ export interface Entreprise {
     ville: string;
     codePostal: string;
   };
+  chantierId: string; // NOUVEAU: Lien vers le chantier
   notes?: string;
   dateCreation: Date;
 }
@@ -78,6 +79,21 @@ export const entreprisesService = {
   // Récupérer toutes les entreprises
   async getAll(): Promise<Entreprise[]> {
     const q = query(collection(db, 'entreprises'), orderBy('dateCreation', 'desc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      dateCreation: doc.data().dateCreation.toDate()
+    } as Entreprise));
+  },
+
+  // Récupérer les entreprises d'un chantier spécifique
+  async getByChantier(chantierId: string): Promise<Entreprise[]> {
+    const q = query(
+      collection(db, 'entreprises'),
+      where('chantierId', '==', chantierId),
+      orderBy('dateCreation', 'desc')
+    );
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({
       id: doc.id,
