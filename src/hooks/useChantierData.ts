@@ -93,17 +93,46 @@ export function useChantierData(chantierId: string | null) {
         try {
           console.log(`📊 Chargement données chantier ${chantierId} (structure par chantier)`);
 
-          // Essayer la nouvelle structure par chantier
+          // Charger les entreprises du chantier
           const entreprisesData = await entreprisesService.getByChantierNew(chantierId);
-
-          // Pour l'instant, les nouveaux chantiers sont vierges
-          // Plus tard, on ajoutera les autres collections par chantier
           setEntreprises(entreprisesData);
-          setDevis([]);
-          setCommandes([]);
-          setPaiements([]);
-          setDocuments([]);
+
+          // Charger devis, commandes, paiements pour chaque entreprise de ce chantier
+          let tousDevis: Devis[] = [];
+          let toutesCommandes: Commande[] = [];
+          let tousPaiements: Paiement[] = [];
+          let tousDocuments: DocumentOfficiel[] = [];
+
+          for (const entreprise of entreprisesData) {
+            if (entreprise.id) {
+              try {
+                const [devisEnt, commandesEnt, paiementsEnt, documentsEnt] = await Promise.all([
+                  devisService.getByEntreprise(entreprise.id),
+                  commandesService.getByEntreprise(entreprise.id),
+                  paiementsService.getByEntreprise(entreprise.id),
+                  documentsService.getByEntreprise(entreprise.id)
+                ]);
+
+                tousDevis.push(...devisEnt);
+                toutesCommandes.push(...commandesEnt);
+                tousPaiements.push(...paiementsEnt);
+                tousDocuments.push(...documentsEnt);
+              } catch (entError) {
+                console.warn(`Erreur chargement données entreprise ${entreprise.nom}:`, entError);
+              }
+            }
+          }
+
+          // Pour les nouveaux chantiers, pas de rendez-vous pour l'instant
+          // TODO: Implémenter une structure de rendez-vous par chantier
           setRendezVous([]);
+
+          setDevis(tousDevis);
+          setCommandes(toutesCommandes);
+          setPaiements(tousPaiements);
+          setDocuments(tousDocuments);
+
+          console.log(`✅ Chantier ${chantierId} chargé: ${entreprisesData.length} entreprises, ${tousDevis.length} devis, ${toutesCommandes.length} commandes, ${tousPaiements.length} paiements`);
 
         } catch (error) {
           console.error(`Erreur chargement chantier ${chantierId}:`, error);

@@ -25,9 +25,15 @@ const requiredEnvVars = [
 
 const missingVars = requiredEnvVars.filter(varName => !import.meta.env[varName]);
 
+// Variables d'environnement chargées
+if (import.meta.env.DEV) {
+  console.log('🔧 Firebase configuré avec succès');
+}
+
 if (missingVars.length > 0) {
-  console.error('Variables d\'environnement Firebase manquantes:', missingVars);
-  console.error('Assure-toi que ton fichier .env.local contient toutes les variables avec le préfixe VITE_');
+  console.warn('⚠️ Variables d\'environnement Firebase manquantes:', missingVars);
+  console.warn('📋 Créez un fichier .env.local avec vos clés Firebase');
+  console.warn('🔧 Guide: https://firebase.google.com/docs/web/setup');
 }
 
 

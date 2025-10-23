@@ -26,7 +26,10 @@ export function UserHeader({ userProfile, onLogout }: UserHeaderProps) {
         </div>
         <div className="text-left hidden lg:block">
           <p className="text-sm font-medium text-gray-100">{userProfile.displayName}</p>
-          <p className="text-xs text-gray-400">{userProfile.role === 'admin' ? 'Administrateur' : 'Utilisateur'}</p>
+          <p className="text-xs text-gray-400">
+            {userProfile.role === 'professional' ? 'Professionnel' :
+              userProfile.role === 'client' ? 'Client' : 'Utilisateur'}
+          </p>
         </div>
         <ChevronDown className="w-4 h-4 text-gray-400 hidden lg:block" />
       </button>
@@ -48,7 +51,8 @@ export function UserHeader({ userProfile, onLogout }: UserHeaderProps) {
                   <p className="font-medium text-gray-100">{userProfile.displayName}</p>
                   <p className="text-sm text-gray-400">{userProfile.email}</p>
                   <p className="text-xs text-gray-500">
-                    {userProfile.role === 'admin' ? 'Administrateur' : 'Utilisateur'}
+                    {userProfile.role === 'professional' ? 'Professionnel' :
+                      userProfile.role === 'client' ? 'Client' : 'Utilisateur'}
                   </p>
                 </div>
               </div>

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { LogIn, Mail, Lock, Eye, EyeOff, UserPlus, RotateCcw } from 'lucide-react';
-import { DebugFirebase } from '../DebugFirebase';
 
 interface LoginFormProps {
   onLogin: (email: string, password: string) => Promise<void>;
@@ -8,10 +7,10 @@ interface LoginFormProps {
   onResetPassword: (email: string) => Promise<void>;
   loading: boolean;
   error: string | null;
-  onDevMode?: () => void;
+  success?: string | null;
 }
 
-export function LoginForm({ onLogin, onSignUp, onResetPassword, loading, error, onDevMode }: LoginFormProps) {
+export function LoginForm({ onLogin, onSignUp, onResetPassword, loading, error, success }: LoginFormProps) {
   const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
   const [formData, setFormData] = useState({
     email: '',
@@ -62,8 +61,18 @@ export function LoginForm({ onLogin, onSignUp, onResetPassword, loading, error, 
           <p className="text-gray-400 mt-2">
             {mode === 'login' && 'Connectez-vous à votre compte'}
             {mode === 'signup' && 'Créez votre compte'}
-            {mode === 'reset' && 'Réinitialisez votre mot de passe'}
+            {mode === 'reset' && 'Récupérez l\'accès à votre compte'}
           </p>
+
+          {/* Message d'aide pour les clients */}
+          {mode === 'reset' && (
+            <div className="mt-4 p-3 bg-blue-600/10 border border-blue-600/20 rounded-lg">
+              <p className="text-xs text-blue-400 text-center">
+                👤 <strong>Client d'un professionnel ?</strong> Utilisez votre email pour recevoir un lien de réinitialisation
+                et définir votre mot de passe.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Formulaire */}
@@ -165,23 +174,17 @@ export function LoginForm({ onLogin, onSignUp, onResetPassword, loading, error, 
               </div>
             )}
 
+            {/* Message de succès */}
+            {success && (
+              <div className="bg-green-600/10 border border-green-600/20 rounded-lg p-3">
+                <p className="text-green-400 text-sm whitespace-pre-line">{success}</p>
+              </div>
+            )}
+
             {/* Message d'erreur */}
             {error && (
               <div className="bg-red-600/10 border border-red-600/20 rounded-lg p-3">
                 <p className="text-red-400 text-sm">{error}</p>
-                {(error.includes('api-key-not-valid') || error.includes('auth/')) && onDevMode && (
-                  <div className="mt-3 pt-3 border-t border-red-600/20">
-                    <p className="text-xs text-gray-400 mb-2">
-                      Problème de configuration Firebase Auth détecté
-                    </p>
-                    <button
-                      onClick={onDevMode}
-                      className="w-full btn-secondary text-sm"
-                    >
-                      Continuer en mode développement
-                    </button>
-                  </div>
-                )}
               </div>
             )}
 
@@ -240,14 +243,24 @@ export function LoginForm({ onLogin, onSignUp, onResetPassword, loading, error, 
             )}
 
             {mode === 'signup' && (
-              <div className="text-center">
-                <span className="text-sm text-gray-400">Déjà un compte ? </span>
-                <button
-                  onClick={() => switchMode('login')}
-                  className="text-sm text-primary-400 hover:text-primary-300 transition-colors"
-                >
-                  Se connecter
-                </button>
+              <div className="text-center space-y-2">
+                <div>
+                  <span className="text-sm text-gray-400">Déjà un compte ? </span>
+                  <button
+                    onClick={() => switchMode('login')}
+                    className="text-sm text-primary-400 hover:text-primary-300 transition-colors"
+                  >
+                    Se connecter
+                  </button>
+                </div>
+                <div>
+                  <button
+                    onClick={() => switchMode('reset')}
+                    className="text-sm text-primary-400 hover:text-primary-300 transition-colors"
+                  >
+                    Mot de passe oublié ?
+                  </button>
+                </div>
               </div>
             )}
 
@@ -263,6 +276,7 @@ export function LoginForm({ onLogin, onSignUp, onResetPassword, loading, error, 
             )}
           </div>
 
+
           {/* Informations sur l'application */}
           <div className="mt-8 pt-6 border-t border-gray-700">
             <div className="text-center space-y-2">
@@ -275,13 +289,12 @@ export function LoginForm({ onLogin, onSignUp, onResetPassword, loading, error, 
                 <span>✅ Mode hors ligne</span>
                 <span>✅ Sécurisé</span>
               </div>
+
             </div>
           </div>
         </div>
       </div>
 
-      {/* Composant de debug Firebase */}
-      <DebugFirebase />
     </div>
   );
 }

@@ -11,15 +11,11 @@ export function UpdatePrompt() {
     // Test de connexion Firebase plus intelligent
     const testFirebaseConnection = async () => {
       try {
-        // Tester une requête Firebase simple
-        const response = await fetch('https://firestore.googleapis.com/', {
-          method: 'HEAD',
-          mode: 'no-cors'
-        });
-        setFirebaseConnected(true);
-        setIsOnline(true);
+        // Simplement vérifier si on est en ligne
+        setFirebaseConnected(navigator.onLine);
+        setIsOnline(navigator.onLine);
       } catch (error) {
-        console.log('Firebase non accessible, mais peut-être en cache');
+        console.log('Erreur test connexion');
         setFirebaseConnected(false);
       }
     };

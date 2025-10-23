@@ -72,19 +72,26 @@ export function PaiementsGlobaux() {
 
   const handleSaveBudget = async (budgetData: Omit<BudgetPrevisionnel, 'id'>) => {
     try {
+      console.log('💾 Tentative sauvegarde budget:', budgetData);
+      
       if (selectedBudget?.id) {
+        console.log('🔄 Mise à jour budget existant:', selectedBudget.id);
         await budgetService.update(selectedBudget.id, budgetData);
       } else {
+        console.log('🆕 Création nouveau budget');
         await budgetService.create({
           ...budgetData,
           dateCreation: new Date(),
           dateModification: new Date()
         });
       }
-      await loadData();
+      
+      console.log('✅ Budget sauvegardé avec succès');
+      await loadBudgets();
       setShowBudgetModal(false);
     } catch (error) {
-      console.error('Erreur lors de la sauvegarde:', error);
+      console.error('❌ Erreur lors de la sauvegarde budget:', error);
+      alert(`Erreur lors de la sauvegarde: ${error.message || error}`);
     }
   };
 

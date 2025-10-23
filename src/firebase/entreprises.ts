@@ -27,6 +27,12 @@ export interface Entreprise {
     ville: string;
     codePostal: string;
   };
+  rib?: {
+    iban: string;
+    bic: string;
+    titulaire: string;
+    banque: string;
+  };
   chantierId: string; // NOUVEAU: Lien vers le chantier
   notes?: string;
   dateCreation: Date;
@@ -130,24 +136,29 @@ export const entreprisesService = {
 
   // Récupérer les entreprises d'un chantier spécifique (nouvelle structure)
   async getByChantierNew(chantierId: string): Promise<Entreprise[]> {
+    console.log(`🔍 Recherche entreprises dans chantiers/${chantierId}/entreprises`);
     const q = query(
       collection(db, `chantiers/${chantierId}/entreprises`),
       orderBy('dateCreation', 'desc')
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
+    const entreprises = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
       dateCreation: doc.data().dateCreation.toDate()
     } as Entreprise));
+    console.log(`📊 Trouvé ${entreprises.length} entreprises dans le chantier ${chantierId}`);
+    return entreprises;
   },
 
   // Créer une entreprise dans un chantier spécifique
   async createInChantier(chantierId: string, entreprise: Omit<Entreprise, 'id'>): Promise<string> {
+    console.log(`🏗️ Création entreprise dans chantier ${chantierId}:`, entreprise.nom);
     const docRef = await addDoc(collection(db, `chantiers/${chantierId}/entreprises`), {
       ...entreprise,
       dateCreation: Timestamp.fromDate(entreprise.dateCreation)
     });
+    console.log(`✅ Entreprise créée avec ID: ${docRef.id} dans chantiers/${chantierId}/entreprises`);
     return docRef.id;
   },
 

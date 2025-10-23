@@ -23,6 +23,12 @@ export function EntrepriseForm({ entreprise, onSave, onCancel }: EntrepriseFormP
       ville: '',
       codePostal: ''
     },
+    rib: {
+      iban: '',
+      bic: '',
+      titulaire: '',
+      banque: ''
+    },
     notes: ''
   });
 
@@ -42,6 +48,12 @@ export function EntrepriseForm({ entreprise, onSave, onCancel }: EntrepriseFormP
         secteurActivite: entreprise.secteurActivite,
         contact: { ...entreprise.contact },
         adresse: { ...entreprise.adresse },
+        rib: entreprise.rib || {
+          iban: '',
+          bic: '',
+          titulaire: '',
+          banque: ''
+        },
         notes: entreprise.notes || ''
       });
     }
@@ -218,6 +230,75 @@ export function EntrepriseForm({ entreprise, onSave, onCancel }: EntrepriseFormP
                 style={{ textTransform: 'uppercase' }}
               />
             </div>
+          </div>
+        </div>
+
+        {/* Coordonnées bancaires */}
+        <div className="form-section">
+          <h3 className="form-title">Coordonnées bancaires (RIB)</h3>
+
+          <div className="form-grid">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                IBAN
+              </label>
+              <input
+                type="text"
+                value={formData.rib.iban}
+                onChange={(e) => handleInputChange('rib.iban', e.target.value.toUpperCase())}
+                className="input-field w-full font-mono"
+                placeholder="FR76 1234 5678 9012 3456 7890 123"
+                maxLength={34}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                BIC/SWIFT
+              </label>
+              <input
+                type="text"
+                value={formData.rib.bic}
+                onChange={(e) => handleInputChange('rib.bic', e.target.value.toUpperCase())}
+                className="input-field w-full font-mono"
+                placeholder="BNPAFRPP"
+                maxLength={11}
+              />
+            </div>
+          </div>
+
+          <div className="form-grid">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Titulaire du compte
+              </label>
+              <input
+                type="text"
+                value={formData.rib.titulaire}
+                onChange={(e) => handleInputChange('rib.titulaire', e.target.value)}
+                className="input-field w-full"
+                placeholder="Ex: SARL Plomberie Martin"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Nom de la banque
+              </label>
+              <input
+                type="text"
+                value={formData.rib.banque}
+                onChange={(e) => handleInputChange('rib.banque', e.target.value)}
+                className="input-field w-full"
+                placeholder="Ex: BNP Paribas"
+              />
+            </div>
+          </div>
+
+          <div className="bg-blue-600/10 border border-blue-600/20 rounded-lg p-3">
+            <p className="text-blue-400 text-sm">
+              💳 Ces informations seront communiquées au client pour les paiements
+            </p>
           </div>
         </div>
 

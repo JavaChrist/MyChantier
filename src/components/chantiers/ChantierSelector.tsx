@@ -1,22 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Calendar, MapPin, Users, ArrowRight, Edit2 } from 'lucide-react';
+import { Plus, Calendar, MapPin, Users, ArrowRight, Edit2, LogOut, Trash2 } from 'lucide-react';
 import { AppIcon, Icon } from '../Icon';
 import { chantierService } from '../../firebase/chantiers';
 import type { Chantier } from '../../firebase/chantiers';
 import { useChantier } from '../../contexts/ChantierContext';
 import { Modal } from '../Modal';
+import { ConfirmModal } from '../ConfirmModal';
 
 interface ChantierSelectorProps {
   professionalId: string;
   professionalName: string;
+  onLogout?: () => void;
 }
 
-export function ChantierSelector({ professionalId, professionalName }: ChantierSelectorProps) {
+export function ChantierSelector({ professionalId, professionalName, onLogout }: ChantierSelectorProps) {
   const [chantiers, setChantiers] = useState<Chantier[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewChantierModal, setShowNewChantierModal] = useState(false);
   const [showEditChantierModal, setShowEditChantierModal] = useState(false);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [selectedChantier, setSelectedChantier] = useState<Chantier | null>(null);
+  const [chantierToDelete, setChantierToDelete] = useState<Chantier | null>(null);
   const { setChantierActuel, setChangtierId } = useChantier();
 
   // Fonction pour obtenir le chantier principal (avec infos sauvegardées)
@@ -100,21 +104,89 @@ export function ChantierSelector({ professionalId, professionalName }: ChantierS
 
   const handleCreateChantier = async (chantierData: Omit<Chantier, 'id'>) => {
     try {
-      // Créer le chantier avec un ID unique
+      // 1. Créer le chantier avec un ID unique
+      const chantierId = `chantier-${Date.now()}`;
       const newChantier: Chantier = {
         ...chantierData,
-        id: `chantier-${Date.now()}`,
+        id: chantierId,
         professionalId,
         dateCreation: new Date(),
         dateModification: new Date()
       };
 
-      // Ajouter à la liste et sauvegarder
+      // 2. Créer automatiquement le compte client
+      if (chantierData.clientEmail && chantierData.clientEmail.trim()) {
+        try {
+          const { authService } = await import('../../firebase/auth');
+          const { createUserWithEmailAndPassword, updateProfile, signOut } = await import('firebase/auth');
+          const { auth } = await import('../../firebase/config');
+
+          console.log('🔧 Création automatique du compte client pour:', chantierData.clientEmail);
+
+          // Générer un mot de passe temporaire aléatoire
+          const tempPassword = 'temp' + Math.random().toString(36).substring(2, 12) + '!';
+
+          try {
+            // Créer le compte client
+            const clientCredential = await createUserWithEmailAndPassword(auth, chantierData.clientEmail, tempPassword);
+            await updateProfile(clientCredential.user, { displayName: chantierData.clientNom });
+
+            // Créer le profil client avec le bon rôle et chantier
+            await authService.createUserProfile(clientCredential.user.uid, {
+              email: chantierData.clientEmail,
+              displayName: chantierData.clientNom,
+              role: 'client',
+              chantierId: chantierId
+            });
+
+            // Se déconnecter du compte client (pour revenir au professionnel)
+            await signOut(auth);
+
+            console.log('✅ Compte client créé automatiquement');
+
+            // Message avec instructions pour le professionnel
+            alert(
+              `✅ Chantier "${chantierData.nom}" et compte client créés !\n\n` +
+              `👤 Client: ${chantierData.clientNom} (${chantierData.clientEmail})\n\n` +
+              `📧 Instructions à transmettre au client :\n\n` +
+              `1. Aller sur votre application de suivi de chantier\n` +
+              `2. Cliquer sur "Mot de passe oublié ?"\n` +
+              `3. Saisir son email: ${chantierData.clientEmail}\n` +
+              `4. Vérifier ses emails et définir un nouveau mot de passe\n` +
+              `5. Se connecter avec son email et nouveau mot de passe\n\n` +
+              `✅ Il aura automatiquement accès à son chantier !`
+            );
+
+          } catch (createError: any) {
+            if (createError.code === 'auth/email-already-in-use') {
+              console.log('ℹ️ Compte client existe déjà');
+              alert(
+                `✅ Chantier "${chantierData.nom}" créé !\n\n` +
+                `ℹ️ Un compte existe déjà pour ${chantierData.clientEmail}\n\n` +
+                `📧 Instructions pour le client :\n\n` +
+                `1. Utiliser "Mot de passe oublié ?" avec son email\n` +
+                `2. Ou se connecter s'il connaît son mot de passe\n\n` +
+                `Il aura accès à ce nouveau chantier.`
+              );
+            } else {
+              throw createError;
+            }
+          }
+
+        } catch (error: any) {
+          console.error('Erreur création compte client:', error);
+          alert(
+            `✅ Chantier créé !\n\n⚠️ Erreur création compte client :\n${error.message}\n\nVous devrez créer le compte manuellement.`
+          );
+        }
+      }
+
+      // 3. Ajouter à la liste et sauvegarder
       const newChantiers = [getChantierPrincipal(), newChantier, ...chantiers.filter(c => c.id !== 'chantier-principal')];
       setChantiers(newChantiers);
       saveChantiers(newChantiers);
-
       setShowNewChantierModal(false);
+
     } catch (error) {
       console.error('Erreur création chantier:', error);
       alert('Erreur lors de la création du chantier');
@@ -124,6 +196,130 @@ export function ChantierSelector({ professionalId, professionalName }: ChantierS
   const handleEditChantier = (chantier: Chantier) => {
     setSelectedChantier(chantier);
     setShowEditChantierModal(true);
+  };
+
+  const handleDeleteChantier = (chantier: Chantier) => {
+    setChantierToDelete(chantier);
+    setShowDeleteConfirmModal(true);
+  };
+
+  const handleConfigureClientAccess = async (chantier: Chantier) => {
+    const currentEmail = chantier.clientEmail;
+    const hasValidEmail = currentEmail && currentEmail !== 'vos-donnees@existantes.com' && currentEmail.includes('@');
+
+    const clientEmail = prompt(
+      `Configurer l'accès client pour "${chantier.nom}"\n\n` +
+      `Email actuel: ${currentEmail}\n\n` +
+      `${hasValidEmail
+        ? 'Voulez-vous créer le compte pour cet email ou en saisir un nouveau ?'
+        : 'Saisissez le vrai email du client pour lui créer un accès :'
+      }`
+    ) || (hasValidEmail ? currentEmail : '');
+
+    if (!clientEmail || clientEmail.trim() === '') return;
+
+    // Valider l'email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(clientEmail)) {
+      alert('⚠️ Adresse email invalide.');
+      return;
+    }
+
+    try {
+      const { authService } = await import('../../firebase/auth');
+      const { createUserWithEmailAndPassword, updateProfile, signOut } = await import('firebase/auth');
+      const { auth } = await import('../../firebase/config');
+
+      console.log('🔧 Configuration accès client pour le chantier principal:', clientEmail);
+
+      // Mettre à jour les informations du chantier principal
+      const updatedChantier = { ...chantier, clientEmail };
+      localStorage.setItem('chantier-principal-info', JSON.stringify(updatedChantier));
+
+      // Mettre à jour dans la liste affichée
+      const updatedChantiers = chantiers.map(c =>
+        c.id === 'chantier-principal' ? updatedChantier : c
+      );
+      setChantiers(updatedChantiers);
+
+      try {
+        // Créer le compte client
+        const tempPassword = 'temp' + Math.random().toString(36).substring(2, 12) + '!';
+        const clientCredential = await createUserWithEmailAndPassword(auth, clientEmail, tempPassword);
+        await updateProfile(clientCredential.user, { displayName: chantier.clientNom });
+
+        // Créer le profil client
+        await authService.createUserProfile(clientCredential.user.uid, {
+          email: clientEmail,
+          displayName: chantier.clientNom,
+          role: 'client',
+          chantierId: 'chantier-principal'
+        });
+
+        // Se déconnecter du compte client
+        await signOut(auth);
+
+        alert(
+          `✅ Accès client configuré pour le chantier principal !\n\n` +
+          `👤 Client: ${chantier.clientNom} (${clientEmail})\n\n` +
+          `📧 Instructions à transmettre au client :\n\n` +
+          `1. Aller sur votre application de suivi de chantier\n` +
+          `2. Cliquer sur "Mot de passe oublié ?"\n` +
+          `3. Saisir son email: ${clientEmail}\n` +
+          `4. Vérifier ses emails et définir un mot de passe\n` +
+          `5. Se connecter avec son email et nouveau mot de passe\n\n` +
+          `✅ Il aura accès à toutes vos données existantes !`
+        );
+
+      } catch (createError: any) {
+        if (createError.code === 'auth/email-already-in-use') {
+          alert(
+            `✅ Email client mis à jour !\n\n` +
+            `ℹ️ Un compte existe déjà pour ${clientEmail}\n\n` +
+            `📧 Instructions pour le client :\n\n` +
+            `1. Utiliser "Mot de passe oublié ?" avec son email\n` +
+            `2. Ou se connecter s'il connaît son mot de passe\n\n` +
+            `Il aura accès à vos données existantes.`
+          );
+        } else {
+          throw createError;
+        }
+      }
+
+    } catch (error: any) {
+      console.error('Erreur configuration accès client:', error);
+      alert(`❌ Erreur lors de la configuration : ${error.message}`);
+    }
+  };
+
+  const confirmDeleteChantier = async () => {
+    if (!chantierToDelete) return;
+
+    try {
+      // Protéger le chantier principal
+      if (chantierToDelete.id === 'chantier-principal') {
+        alert('⚠️ Le chantier principal ne peut pas être supprimé car il contient vos données existantes.');
+        setShowDeleteConfirmModal(false);
+        setChantierToDelete(null);
+        return;
+      }
+
+      console.log('🗑️ Suppression du chantier:', chantierToDelete.nom);
+
+      // Supprimer de la liste
+      const updatedChantiers = chantiers.filter(c => c.id !== chantierToDelete.id);
+      setChantiers(updatedChantiers);
+      saveChantiers(updatedChantiers);
+
+      // TODO: Supprimer aussi les données liées (entreprises, devis, etc.) si nécessaire
+      console.log('✅ Chantier supprimé avec succès');
+
+      setShowDeleteConfirmModal(false);
+      setChantierToDelete(null);
+    } catch (error) {
+      console.error('Erreur suppression chantier:', error);
+      alert('Erreur lors de la suppression du chantier');
+    }
   };
 
   const handleUpdateChantier = async (chantierData: Omit<Chantier, 'id'>) => {
@@ -157,6 +353,31 @@ export function ChantierSelector({ professionalId, professionalName }: ChantierS
     } catch (error) {
       console.error('Erreur modification chantier:', error);
       alert('Erreur lors de la modification du chantier');
+    }
+  };
+
+  const handleFixUserName = async () => {
+    const newName = prompt(
+      'Corriger votre nom d\'affichage :\n\n' +
+      'Saisissez votre vrai nom :'
+    );
+
+    if (!newName || newName.trim() === '') return;
+
+    try {
+      const { authService } = await import('../../firebase/auth');
+      const { auth } = await import('../../firebase/config');
+
+      if (auth.currentUser) {
+        await authService.updateUserProfile(auth.currentUser.uid, {
+          displayName: newName.trim()
+        });
+
+        alert(`✅ Nom mis à jour vers "${newName.trim()}" !\n\nReconnectez-vous pour voir le changement.`);
+      }
+    } catch (error) {
+      console.error('Erreur mise à jour nom:', error);
+      alert('❌ Erreur lors de la mise à jour du nom.');
     }
   };
 
@@ -208,12 +429,32 @@ export function ChantierSelector({ professionalId, professionalName }: ChantierS
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-4xl mx-auto">
         {/* En-tête */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-8 relative">
+          {/* Bouton de déconnexion */}
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="absolute top-0 right-0 flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Se déconnecter</span>
+            </button>
+          )}
+
           <div className="w-20 h-20 bg-primary-600 rounded-full flex items-center justify-center mx-auto mb-4">
             <AppIcon size={48} className="brightness-100" />
           </div>
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
             Bonjour {professionalName} !
+            {professionalName === 'Utilisateur' && (
+              <button
+                onClick={handleFixUserName}
+                className="ml-2 text-sm text-blue-600 hover:text-blue-800 underline"
+                title="Corriger le nom d'affichage"
+              >
+                (corriger le nom)
+              </button>
+            )}
           </h1>
           <p className="text-gray-600">
             Sélectionnez le chantier sur lequel vous souhaitez travailler
@@ -262,16 +503,43 @@ export function ChantierSelector({ professionalId, professionalName }: ChantierS
                     <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatutColor(chantier.statut)}`}>
                       {getStatutLabel(chantier.statut)}
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEditChantier(chantier);
-                      }}
-                      className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg transition-colors"
-                      title="Modifier le chantier"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center space-x-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditChantier(chantier);
+                        }}
+                        className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg transition-colors"
+                        title="Modifier le chantier"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      {/* Bouton spécial pour le chantier principal */}
+                      {chantier.id === 'chantier-principal' ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleConfigureClientAccess(chantier);
+                          }}
+                          className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                          title="Configurer l'accès client"
+                        >
+                          <Users className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        /* Bouton de suppression pour les autres chantiers */
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteChantier(chantier);
+                          }}
+                          className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Supprimer le chantier"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -289,6 +557,22 @@ export function ChantierSelector({ professionalId, professionalName }: ChantierS
                     <div className="flex items-center space-x-2 text-sm text-gray-600">
                       <Users className="w-4 h-4" />
                       <span>{chantier.clientNom}</span>
+                      {/* Indicateur accès client pour le chantier principal */}
+                      {chantier.id === 'chantier-principal' && (
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${chantier.clientEmail &&
+                          chantier.clientEmail !== 'vos-donnees@existantes.com' &&
+                          chantier.clientEmail.includes('@')
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                          {chantier.clientEmail &&
+                            chantier.clientEmail !== 'vos-donnees@existantes.com' &&
+                            chantier.clientEmail.includes('@')
+                            ? '📧 ' + chantier.clientEmail
+                            : '⚙️ Configurer email client'
+                          }
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center space-x-2 text-sm text-gray-600">
                       <MapPin className="w-4 h-4" />
@@ -354,6 +638,25 @@ export function ChantierSelector({ professionalId, professionalName }: ChantierS
             onCancel={() => setShowEditChantierModal(false)}
           />
         </Modal>
+
+        {/* Modal de confirmation de suppression */}
+        <ConfirmModal
+          isOpen={showDeleteConfirmModal}
+          onConfirm={confirmDeleteChantier}
+          onCancel={() => {
+            setShowDeleteConfirmModal(false);
+            setChantierToDelete(null);
+          }}
+          title="Confirmer la suppression"
+          message={
+            chantierToDelete
+              ? `Êtes-vous sûr de vouloir supprimer le chantier "${chantierToDelete.nom}" ?\n\nCette action est irréversible et supprimera toutes les données associées.`
+              : ''
+          }
+          confirmText="Supprimer"
+          cancelText="Annuler"
+          type="danger"
+        />
       </div>
     </div>
   );
@@ -486,15 +789,19 @@ function NewChantierForm({
 
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
-            Email du client
+            Email du client *
           </label>
           <input
             type="email"
+            required
             value={formData.clientEmail}
             onChange={(e) => setFormData(prev => ({ ...prev, clientEmail: e.target.value }))}
             className="input-field w-full"
-            placeholder="client@email.com"
+            placeholder="client@exemple.com"
           />
+          <p className="text-xs text-blue-400 mt-1">
+            💡 Un compte client sera automatiquement créé avec cet email
+          </p>
         </div>
       </div>
 
