@@ -91,10 +91,12 @@ export function EntreprisesManager() {
           });
         } else {
           // Nouveau système pour les autres chantiers
-          await entreprisesService.createInChantier(chantierId, {
+          console.log(`🏗️ Création entreprise dans chantier ${chantierId} via EntreprisesManager`);
+          const newId = await entreprisesService.createInChantier(chantierId, {
             ...finalData,
             dateCreation: new Date()
           });
+          console.log(`✅ Entreprise créée avec ID: ${newId}`);
         }
       }
       await reloadData();

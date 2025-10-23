@@ -39,6 +39,8 @@ export function useChantierData(chantierId: string | null) {
       setLoading(true);
       setError(null);
 
+      console.log(`🔍 CHARGEMENT DONNÉES pour chantier: ${chantierId}`);
+
       // Chargement selon le type de chantier
       if (chantierId === 'chantier-principal') {
         // CHANTIER PRINCIPAL = Anciennes données (structure globale)
@@ -133,6 +135,11 @@ export function useChantierData(chantierId: string | null) {
           setDocuments(tousDocuments);
 
           console.log(`✅ Chantier ${chantierId} chargé: ${entreprisesData.length} entreprises, ${tousDevis.length} devis, ${toutesCommandes.length} commandes, ${tousPaiements.length} paiements`);
+
+          if (entreprisesData.length === 0) {
+            console.warn(`⚠️ Aucune entreprise trouvée dans chantiers/${chantierId}/entreprises`);
+            console.log('🔍 Vérifiez que les entreprises sont bien créées dans cette collection Firebase');
+          }
 
         } catch (error) {
           console.error(`Erreur chargement chantier ${chantierId}:`, error);

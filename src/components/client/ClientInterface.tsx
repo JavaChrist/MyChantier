@@ -20,11 +20,19 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
   console.log('🔍 DEBUG CLIENT:', {
     userProfile: userProfile,
     chantierId: chantierId,
+    userChantierId: userProfile?.chantierId,
     entreprisesCount: entreprises.length,
     devisCount: devis.length,
     commandesCount: commandes.length,
     paiementsCount: paiements.length
   });
+
+  // ALERTE si le client voit des données du chantier principal
+  if (chantierId === 'chantier-principal' && userProfile?.chantierId !== 'chantier-principal') {
+    console.warn('🚨 PROBLÈME: Client voit le chantier principal au lieu de son chantier!');
+    console.warn('Client chantierId:', userProfile?.chantierId);
+    console.warn('Interface chantierId:', chantierId);
+  }
 
   // Calculer les stats pour le client
   const stats = {

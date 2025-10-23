@@ -241,6 +241,21 @@ export const authService = {
     }
   },
 
+  // Fonction pour corriger l'ID de chantier d'un client
+  async fixClientChantier(clientEmail: string, correctChantierId: string): Promise<void> {
+    try {
+      // Rechercher l'utilisateur par email (simulation)
+      console.log(`🔧 Correction du chantier pour ${clientEmail} → ${correctChantierId}`);
+
+      // Pour l'instant, on garde cette fonction pour usage manuel
+      // En production, il faudrait une recherche par email dans Firestore
+
+    } catch (error) {
+      console.error('Erreur correction chantier client:', error);
+      throw error;
+    }
+  },
+
   // Observer les changements d'état d'authentification
   onAuthStateChanged: (callback: (user: User | null) => void) => {
     return onAuthStateChanged(auth, callback);

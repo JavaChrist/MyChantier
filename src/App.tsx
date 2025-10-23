@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { Navigation } from './components/Navigation';
 import { MobileNavigation } from './components/MobileNavigation';
 import { Dashboard } from './components/Dashboard';
@@ -163,7 +164,64 @@ function AuthenticatedApp({
 // Interface client (accès à UN seul chantier)
 function ClientApp({ userProfile, onLogout }: { userProfile: any; onLogout: () => void }) {
   // Le client n'a accès qu'à SON chantier spécifique
-  const clientChantierId = userProfile?.chantierId || 'chantier-principal';
+  const clientChantierId = userProfile?.chantierId;
+
+  // Si le client n'a pas de chantier assigné, afficher une erreur
+  if (!clientChantierId) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+        <div className="max-w-md w-full text-center space-y-6">
+          <div className="w-16 h-16 bg-yellow-600 rounded-full flex items-center justify-center mx-auto">
+            <AlertTriangle className="w-8 h-8 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-gray-100 mb-2">Aucun chantier assigné</h1>
+            <p className="text-gray-400 mb-4">
+              Votre compte client n'est associé à aucun chantier.
+            </p>
+            <p className="text-sm text-gray-500 mb-6">
+              Contactez votre professionnel pour qu'il vous associe à un chantier.
+            </p>
+          </div>
+          <button
+            onClick={onLogout}
+            className="btn-primary w-full"
+          >
+            Se déconnecter
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Vérifier si le chantier du client existe encore
+  if (userProfile?.chantierId && userProfile.chantierId.startsWith('chantier-') && userProfile.chantierId !== 'chantier-principal') {
+    // Ce client était lié à un chantier qui a été supprimé
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+        <div className="max-w-md w-full text-center space-y-6">
+          <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center mx-auto">
+            <AlertTriangle className="w-8 h-8 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-gray-100 mb-2">Chantier non disponible</h1>
+            <p className="text-gray-400 mb-4">
+              Le chantier associé à votre compte ({userProfile.chantierId}) n'est plus disponible.
+            </p>
+            <p className="text-sm text-gray-500 mb-6">
+              Contactez votre professionnel pour qu'il vous associe à un nouveau chantier.
+            </p>
+          </div>
+          <button
+            onClick={onLogout}
+            className="btn-primary w-full"
+          >
+            Se déconnecter
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <ChantierProvider>

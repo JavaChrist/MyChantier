@@ -21,6 +21,8 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [selectedChantier, setSelectedChantier] = useState<Chantier | null>(null);
   const [chantierToDelete, setChantierToDelete] = useState<Chantier | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   const { setChantierActuel, setChangtierId } = useChantier();
 
   // Fonction pour obtenir le chantier principal (avec infos sauvegardées)
@@ -38,17 +40,18 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
       };
     }
 
-    // Valeurs par défaut si pas de sauvegarde
+    // VALEURS CORRECTES par défaut (vos vraies données)
     return {
       id: 'chantier-principal',
-      nom: '🏠 Mes Données Existantes',
-      description: 'Toutes vos données actuelles (entreprises, devis, etc.)',
-      clientNom: 'Données existantes',
-      clientEmail: 'vos-donnees@existantes.com',
-      adresse: 'Toutes vos données actuelles',
-      dateDebut: new Date('2024-01-01'),
-      dateFinPrevue: new Date('2024-12-31'),
-      budget: 0,
+      nom: '🏠 Rénovation ancien chemin du halage',
+      description: 'Rénovation complète d\'une maison d\'habitation',
+      clientNom: 'Grohens Pitet',
+      clientEmail: 'coralie.grohens@gmail.com',
+      clientTelephone: '',
+      adresse: '27 ancien chemin du halage 31170 Tournefeuille',
+      dateDebut: new Date('2025-01-10'),
+      dateFinPrevue: new Date('2025-01-02'),
+      budget: 35000,
       statut: 'en-cours',
       professionalId: 'professional-1',
       dateCreation: new Date('2024-01-01'),
@@ -81,8 +84,12 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
         dateModification: new Date(chantier.dateModification)
       }));
 
-      // Chantier principal + autres chantiers
-      setChantiers([chantierPrincipalActuel, ...chantiersWithDates]);
+      // Combiner chantier principal + autres chantiers (éviter doublons)
+      const chantiersUniques = chantiersWithDates.filter(c => c.id !== 'chantier-principal');
+      const tousLesChantiers = [chantierPrincipalActuel, ...chantiersUniques];
+      setChantiers(tousLesChantiers);
+
+      console.log('🔧 CHARGEMENT: Chantiers chargés:', tousLesChantiers.map(c => ({ nom: c.nom, id: c.id })));
     } catch (error) {
       console.error('Erreur chargement chantiers:', error);
       setChantiers([getChantierPrincipal()]);
@@ -92,9 +99,11 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
   };
 
   const saveChantiers = (newChantiers: Chantier[]) => {
-    // Sauvegarder tous sauf le chantier principal
+    // Sauvegarder SEULEMENT les nouveaux chantiers (pas le principal)
     const chantiersToSave = newChantiers.filter(c => c.id !== 'chantier-principal');
     localStorage.setItem('chantiers', JSON.stringify(chantiersToSave));
+
+    console.log('💾 Sauvegarde des chantiers:', chantiersToSave.map(c => ({ nom: c.nom, id: c.id })));
   };
 
   const handleSelectChantier = (chantier: Chantier) => {
@@ -145,8 +154,8 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
             console.log('✅ Compte client créé automatiquement');
 
             // Message avec instructions pour le professionnel
-            alert(
-              `✅ Chantier "${chantierData.nom}" et compte client créés !\n\n` +
+            setSuccessMessage(
+              `Chantier "${chantierData.nom}" et compte client créés !\n\n` +
               `👤 Client: ${chantierData.clientNom} (${chantierData.clientEmail})\n\n` +
               `📧 Instructions à transmettre au client :\n\n` +
               `1. Aller sur votre application de suivi de chantier\n` +
@@ -156,18 +165,26 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
               `5. Se connecter avec son email et nouveau mot de passe\n\n` +
               `✅ Il aura automatiquement accès à son chantier !`
             );
+            setShowSuccessModal(true);
 
           } catch (createError: any) {
             if (createError.code === 'auth/email-already-in-use') {
-              console.log('ℹ️ Compte client existe déjà');
-              alert(
-                `✅ Chantier "${chantierData.nom}" créé !\n\n` +
-                `ℹ️ Un compte existe déjà pour ${chantierData.clientEmail}\n\n` +
-                `📧 Instructions pour le client :\n\n` +
-                `1. Utiliser "Mot de passe oublié ?" avec son email\n` +
-                `2. Ou se connecter s'il connaît son mot de passe\n\n` +
-                `Il aura accès à ce nouveau chantier.`
+              console.log('ℹ️ Compte client existe déjà - tentative de mise à jour du chantier');
+
+              // TODO: Mettre à jour le chantierId du compte existant
+              // Pour l'instant, on informe que le compte existe mais ne sera pas associé automatiquement
+
+              setSuccessMessage(
+                `Chantier "${chantierData.nom}" créé !\n\n` +
+                `⚠️ Un compte existe déjà pour ${chantierData.clientEmail}\n\n` +
+                `IMPORTANT: Ce compte était associé à un autre chantier.\n` +
+                `Vous devez manuellement associer ce client au nouveau chantier.\n\n` +
+                `📧 Instructions pour le client :\n` +
+                `1. Se connecter avec son email et mot de passe existant\n` +
+                `2. Ou utiliser "Mot de passe oublié ?" s'il a oublié\n\n` +
+                `⚠️ ATTENTION: Il verra peut-être l'ancien chantier - contactez-moi pour corriger.`
               );
+              setShowSuccessModal(true);
             } else {
               throw createError;
             }
@@ -175,21 +192,28 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
 
         } catch (error: any) {
           console.error('Erreur création compte client:', error);
-          alert(
-            `✅ Chantier créé !\n\n⚠️ Erreur création compte client :\n${error.message}\n\nVous devrez créer le compte manuellement.`
+          setSuccessMessage(
+            `Chantier créé !\n\n⚠️ Erreur création compte client :\n${error.message}\n\nVous devrez créer le compte manuellement.`
           );
+          setShowSuccessModal(true);
         }
       }
 
-      // 3. Ajouter à la liste et sauvegarder
-      const newChantiers = [getChantierPrincipal(), newChantier, ...chantiers.filter(c => c.id !== 'chantier-principal')];
-      setChantiers(newChantiers);
-      saveChantiers(newChantiers);
+      // 3. Ajouter à la liste sans toucher au localStorage pour l'instant
+      const tousChantiers = [...chantiers, newChantier];
+      setChantiers(tousChantiers);
+
+      // Sauvegarder SEULEMENT les nouveaux chantiers (pas le principal)
+      const nouveauxChantiers = tousChantiers.filter(c => c.id !== 'chantier-principal');
+      localStorage.setItem('chantiers', JSON.stringify(nouveauxChantiers));
+
+      console.log('💾 Nouveau chantier ajouté:', newChantier.nom);
       setShowNewChantierModal(false);
 
     } catch (error) {
       console.error('Erreur création chantier:', error);
-      alert('Erreur lors de la création du chantier');
+      setSuccessMessage('❌ Erreur lors de la création du chantier');
+      setShowSuccessModal(true);
     }
   };
 
@@ -221,7 +245,8 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
     // Valider l'email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(clientEmail)) {
-      alert('⚠️ Adresse email invalide.');
+      setSuccessMessage('⚠️ Adresse email invalide.');
+      setShowSuccessModal(true);
       return;
     }
 
@@ -259,8 +284,8 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
         // Se déconnecter du compte client
         await signOut(auth);
 
-        alert(
-          `✅ Accès client configuré pour le chantier principal !\n\n` +
+        setSuccessMessage(
+          `Accès client configuré pour le chantier principal !\n\n` +
           `👤 Client: ${chantier.clientNom} (${clientEmail})\n\n` +
           `📧 Instructions à transmettre au client :\n\n` +
           `1. Aller sur votre application de suivi de chantier\n` +
@@ -270,17 +295,19 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
           `5. Se connecter avec son email et nouveau mot de passe\n\n` +
           `✅ Il aura accès à toutes vos données existantes !`
         );
+        setShowSuccessModal(true);
 
       } catch (createError: any) {
         if (createError.code === 'auth/email-already-in-use') {
-          alert(
-            `✅ Email client mis à jour !\n\n` +
+          setSuccessMessage(
+            `Email client mis à jour !\n\n` +
             `ℹ️ Un compte existe déjà pour ${clientEmail}\n\n` +
             `📧 Instructions pour le client :\n\n` +
             `1. Utiliser "Mot de passe oublié ?" avec son email\n` +
             `2. Ou se connecter s'il connaît son mot de passe\n\n` +
             `Il aura accès à vos données existantes.`
           );
+          setShowSuccessModal(true);
         } else {
           throw createError;
         }
@@ -288,7 +315,8 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
 
     } catch (error: any) {
       console.error('Erreur configuration accès client:', error);
-      alert(`❌ Erreur lors de la configuration : ${error.message}`);
+      setSuccessMessage(`❌ Erreur lors de la configuration : ${error.message}`);
+      setShowSuccessModal(true);
     }
   };
 
@@ -296,31 +324,39 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
     if (!chantierToDelete) return;
 
     try {
-      // Protéger le chantier principal
-      if (chantierToDelete.id === 'chantier-principal') {
-        alert('⚠️ Le chantier principal ne peut pas être supprimé car il contient vos données existantes.');
+      // PROTECTION ABSOLUE du chantier principal
+      if (chantierToDelete.id === 'chantier-principal' ||
+        chantierToDelete.nom.includes('Rénovation ancien') ||
+        chantierToDelete.clientNom === 'Grohens Pitet') {
+        setSuccessMessage('🚨 ERREUR : Ce chantier ne peut pas être supprimé !\n\nIl contient vos vraies données. Seuls les chantiers de test peuvent être supprimés.');
+        setShowSuccessModal(true);
         setShowDeleteConfirmModal(false);
         setChantierToDelete(null);
         return;
       }
 
-      console.log('🗑️ Suppression du chantier:', chantierToDelete.nom);
+      console.log('🗑️ Suppression du chantier de test:', chantierToDelete.nom, 'ID:', chantierToDelete.id);
 
-      // Supprimer de la liste
-      const updatedChantiers = chantiers.filter(c => c.id !== chantierToDelete.id);
-      setChantiers(updatedChantiers);
-      saveChantiers(updatedChantiers);
+      // Supprimer SEULEMENT de localStorage (pas le chantier principal)
+      const saved = localStorage.getItem('chantiers');
+      const savedChantiers = saved ? JSON.parse(saved) : [];
+      const updatedSaved = savedChantiers.filter((c: any) => c.id !== chantierToDelete.id);
+      localStorage.setItem('chantiers', JSON.stringify(updatedSaved));
 
-      // TODO: Supprimer aussi les données liées (entreprises, devis, etc.) si nécessaire
-      console.log('✅ Chantier supprimé avec succès');
+      // Recharger tous les chantiers (le principal sera toujours là)
+      await loadChantiers();
+
+      console.log('✅ Chantier de test supprimé avec succès');
 
       setShowDeleteConfirmModal(false);
       setChantierToDelete(null);
     } catch (error) {
       console.error('Erreur suppression chantier:', error);
-      alert('Erreur lors de la suppression du chantier');
+      setSuccessMessage('❌ Erreur lors de la suppression du chantier');
+      setShowSuccessModal(true);
     }
   };
+
 
   const handleUpdateChantier = async (chantierData: Omit<Chantier, 'id'>) => {
     if (!selectedChantier) return;
@@ -373,11 +409,13 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
           displayName: newName.trim()
         });
 
-        alert(`✅ Nom mis à jour vers "${newName.trim()}" !\n\nReconnectez-vous pour voir le changement.`);
+        setSuccessMessage(`Nom mis à jour vers "${newName.trim()}" !\n\nReconnectez-vous pour voir le changement.`);
+        setShowSuccessModal(true);
       }
     } catch (error) {
       console.error('Erreur mise à jour nom:', error);
-      alert('❌ Erreur lors de la mise à jour du nom.');
+      setSuccessMessage('❌ Erreur lors de la mise à jour du nom.');
+      setShowSuccessModal(true);
     }
   };
 
@@ -514,20 +552,20 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
-                      {/* Bouton spécial pour le chantier principal */}
-                      {chantier.id === 'chantier-principal' ? (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleConfigureClientAccess(chantier);
-                          }}
-                          className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                          title="Configurer l'accès client"
-                        >
-                          <Users className="w-4 h-4" />
-                        </button>
-                      ) : (
-                        /* Bouton de suppression pour les autres chantiers */
+                      {/* Bouton configurer accès client pour tous les chantiers */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleConfigureClientAccess(chantier);
+                        }}
+                        className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                        title="Configurer l'accès client"
+                      >
+                        <Users className="w-4 h-4" />
+                      </button>
+
+                      {/* Bouton de suppression - masqué pour le chantier principal */}
+                      {chantier.id !== 'chantier-principal' && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -557,22 +595,10 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
                     <div className="flex items-center space-x-2 text-sm text-gray-600">
                       <Users className="w-4 h-4" />
                       <span>{chantier.clientNom}</span>
-                      {/* Indicateur accès client pour le chantier principal */}
-                      {chantier.id === 'chantier-principal' && (
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${chantier.clientEmail &&
-                          chantier.clientEmail !== 'vos-donnees@existantes.com' &&
-                          chantier.clientEmail.includes('@')
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-yellow-100 text-yellow-800'
-                          }`}>
-                          {chantier.clientEmail &&
-                            chantier.clientEmail !== 'vos-donnees@existantes.com' &&
-                            chantier.clientEmail.includes('@')
-                            ? '📧 ' + chantier.clientEmail
-                            : '⚙️ Configurer email client'
-                          }
-                        </span>
-                      )}
+                      {/* Indicateur d'ID pour debug */}
+                      <span className="px-2 py-1 rounded-full text-xs font-mono bg-gray-100 text-gray-600">
+                        {chantier.id}
+                      </span>
                     </div>
                     <div className="flex items-center space-x-2 text-sm text-gray-600">
                       <MapPin className="w-4 h-4" />
@@ -657,6 +683,30 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
           cancelText="Annuler"
           type="danger"
         />
+
+        {/* Modal de succès moderne */}
+        <Modal
+          isOpen={showSuccessModal}
+          onClose={() => setShowSuccessModal(false)}
+          title="✅ Succès"
+          size="lg"
+        >
+          <div className="space-y-4">
+            <div className="bg-green-600/10 border border-green-600/20 rounded-lg p-4">
+              <pre className="text-sm text-green-400 whitespace-pre-wrap font-sans">
+                {successMessage}
+              </pre>
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                className="btn-primary"
+              >
+                Compris
+              </button>
+            </div>
+          </div>
+        </Modal>
       </div>
     </div>
   );

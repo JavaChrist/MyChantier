@@ -430,57 +430,14 @@ export function AssurancesManager() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3">
-                    <div>
+                  <div className="mb-3">
+                    <div className="flex items-center space-x-3 text-sm">
                       <span className="text-gray-400">Type:</span>
-                      <p className="text-gray-100 font-medium">{getTypeLabel(document.type)}</p>
+                      <span className="text-gray-100 font-medium">{getTypeLabel(document.type)}</span>
+                      <span className="text-gray-400">•</span>
+                      <span className="text-gray-300">{document.fichierNom}</span>
                     </div>
-                    {document.numeroPolice && (
-                      <div>
-                        <span className="text-gray-400">N° Police:</span>
-                        <p className="text-gray-100">{document.numeroPolice}</p>
-                      </div>
-                    )}
-                    {document.dateFin && (
-                      <div>
-                        <span className="text-gray-400">Date fin:</span>
-                        <p className={`${document.statut === 'expire' ? 'text-red-400' :
-                          document.statut === 'bientot-expire' ? 'text-yellow-400' :
-                            'text-gray-100'
-                          }`}>
-                          {document.dateFin.toLocaleDateString('fr-FR')}
-                        </p>
-                        {joursRestants !== null && (
-                          <p className={`text-xs ${joursRestants < 0 ? 'text-red-400' :
-                            joursRestants <= 30 ? 'text-yellow-400' :
-                              'text-green-400'
-                            }`}>
-                            {joursRestants < 0 ? `Expiré depuis ${Math.abs(joursRestants)} jour(s)` :
-                              joursRestants === 0 ? 'Expire aujourd\'hui' :
-                                `Expire dans ${joursRestants} jour(s)`
-                            }
-                          </p>
-                        )}
-                      </div>
-                    )}
-                    {document.montantGarantie && (
-                      <div>
-                        <span className="text-gray-400">Garantie:</span>
-                        <p className="text-gray-100 font-medium">{document.montantGarantie.toLocaleString()} €</p>
-                      </div>
-                    )}
                   </div>
-
-                  {document.description && (
-                    <p className="text-sm text-gray-300 mb-3">{document.description}</p>
-                  )}
-
-                  {document.compagnieAssurance && (
-                    <div className="text-sm">
-                      <span className="text-gray-400">Compagnie: </span>
-                      <span className="text-gray-100">{document.compagnieAssurance}</span>
-                    </div>
-                  )}
 
                   <div className="mt-3 pt-3 border-t border-gray-600 flex items-center justify-between text-xs text-gray-400">
                     <span>Uploadé le {document.dateUpload.toLocaleDateString('fr-FR')}</span>
@@ -541,14 +498,7 @@ function DocumentForm({
   const [formData, setFormData] = useState({
     entrepriseId: '',
     type: 'assurance-rc' as const,
-    nom: '',
-    description: '',
-    numeroPolice: '',
-    compagnieAssurance: '',
-    dateDebut: '',
-    dateFin: '',
-    montantGarantie: '',
-    notes: ''
+    nom: ''
   });
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -559,14 +509,7 @@ function DocumentForm({
       setFormData({
         entrepriseId: document.entrepriseId,
         type: document.type,
-        nom: document.nom,
-        description: document.description,
-        numeroPolice: document.numeroPolice || '',
-        compagnieAssurance: document.compagnieAssurance || '',
-        dateDebut: document.dateDebut?.toISOString().split('T')[0] || '',
-        dateFin: document.dateFin?.toISOString().split('T')[0] || '',
-        montantGarantie: document.montantGarantie?.toString() || '',
-        notes: document.notes || ''
+        nom: document.nom
       });
     }
   }, [document]);
@@ -585,13 +528,6 @@ function DocumentForm({
       const documentData: Omit<DocumentOfficiel, 'id' | 'entrepriseId'> = {
         type: formData.type,
         nom: formData.nom,
-        description: formData.description,
-        numeroPolice: formData.numeroPolice || undefined,
-        compagnieAssurance: formData.compagnieAssurance || undefined,
-        dateDebut: formData.dateDebut ? new Date(formData.dateDebut) : undefined,
-        dateFin: formData.dateFin ? new Date(formData.dateFin) : undefined,
-        montantGarantie: formData.montantGarantie ? parseFloat(formData.montantGarantie) : undefined,
-        notes: formData.notes,
         statut: 'valide',
         fichierUrl: document?.fichierUrl || '',
         fichierNom: document?.fichierNom || '',
@@ -688,97 +624,16 @@ function DocumentForm({
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
-          Description
-        </label>
-        <textarea
-          value={formData.description}
-          onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-          rows={2}
-          className="input-field w-full resize-none"
-          placeholder="Description du document..."
-        />
+      {/* Informations simplifiées */}
+      <div className="bg-blue-600/10 border border-blue-600/20 rounded-lg p-4">
+        <h4 className="text-sm font-medium text-blue-400 mb-2">💡 Informations simplifiées</h4>
+        <p className="text-xs text-gray-300">
+          Les détails (dates, montants, n° de police, etc.) sont directement lisibles dans le document uploadé.
+          Seules les informations essentielles sont demandées pour l'organisation.
+        </p>
       </div>
 
-      {/* Champs spécifiques selon le type */}
-      {['assurance-rc', 'assurance-decennale'].includes(formData.type) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              N° de police
-            </label>
-            <input
-              type="text"
-              value={formData.numeroPolice}
-              onChange={(e) => setFormData(prev => ({ ...prev, numeroPolice: e.target.value }))}
-              className="input-field w-full"
-              placeholder="Ex: RC-2024-123456"
-            />
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Compagnie d'assurance
-            </label>
-            <input
-              type="text"
-              value={formData.compagnieAssurance}
-              onChange={(e) => setFormData(prev => ({ ...prev, compagnieAssurance: e.target.value }))}
-              className="input-field w-full"
-              placeholder="Ex: AXA, Allianz..."
-            />
-          </div>
-        </div>
-      )}
-
-      {formData.type === 'kbis' && (
-        <div className="bg-blue-600/10 border border-blue-600/20 rounded-lg p-3">
-          <p className="text-blue-400 text-sm">
-            📋 Document KBIS : Extrait d'immatriculation au registre du commerce
-          </p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Date de début
-          </label>
-          <input
-            type="date"
-            value={formData.dateDebut}
-            onChange={(e) => setFormData(prev => ({ ...prev, dateDebut: e.target.value }))}
-            className="input-field w-full"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Date de fin
-          </label>
-          <input
-            type="date"
-            value={formData.dateFin}
-            onChange={(e) => setFormData(prev => ({ ...prev, dateFin: e.target.value }))}
-            className="input-field w-full"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Montant garanti (€)
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            value={formData.montantGarantie}
-            onChange={(e) => setFormData(prev => ({ ...prev, montantGarantie: e.target.value }))}
-            className="input-field w-full"
-            placeholder="500000.00"
-          />
-        </div>
-      </div>
 
       {/* Upload de fichier */}
       <div>
@@ -819,18 +674,6 @@ function DocumentForm({
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
-          Notes
-        </label>
-        <textarea
-          value={formData.notes}
-          onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-          rows={3}
-          className="input-field w-full resize-none"
-          placeholder="Notes supplémentaires..."
-        />
-      </div>
 
       <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-700">
         <button
