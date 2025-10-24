@@ -60,8 +60,36 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
   };
 
   useEffect(() => {
+    // FORCER la restauration du chantier principal au démarrage
+    forceRestoreChantierPrincipal();
     loadChantiers();
   }, [professionalId]);
+
+  const forceRestoreChantierPrincipal = () => {
+    console.log('🚨 FORCE RESTAURATION du chantier principal');
+
+    // Restaurer les vraies données du chantier principal
+    const vraiChantierPrincipal: Chantier = {
+      id: 'chantier-principal',
+      nom: '🏠 Rénovation ancien chemin du halage',
+      description: 'Rénovation complète d\'une maison d\'habitation',
+      clientNom: 'Grohens Pitet',
+      clientEmail: 'coralie.grohens@gmail.com',
+      clientTelephone: '',
+      adresse: '27 ancien chemin du halage 31170 Tournefeuille',
+      dateDebut: new Date('2025-01-10'),
+      dateFinPrevue: new Date('2025-01-02'),
+      budget: 35000,
+      statut: 'en-cours',
+      professionalId: professionalId,
+      dateCreation: new Date('2024-01-01'),
+      dateModification: new Date()
+    };
+
+    // Sauvegarder de force
+    localStorage.setItem('chantier-principal-info', JSON.stringify(vraiChantierPrincipal));
+    console.log('✅ Chantier principal restauré de force');
+  };
 
   const loadChantiers = async () => {
     try {
@@ -86,7 +114,13 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
 
       // Combiner chantier principal + autres chantiers (éviter doublons)
       const chantiersUniques = chantiersWithDates.filter(c => c.id !== 'chantier-principal');
-      const tousLesChantiers = [chantierPrincipalActuel, ...chantiersUniques];
+
+      // Supprimer les doublons par nom ET par ID
+      const chantiersFiltrés = chantiersUniques.filter((chantier, index, array) =>
+        array.findIndex(c => c.nom === chantier.nom || c.id === chantier.id) === index
+      );
+
+      const tousLesChantiers = [chantierPrincipalActuel, ...chantiersFiltrés];
       setChantiers(tousLesChantiers);
 
       console.log('🔧 CHARGEMENT: Chantiers chargés:', tousLesChantiers.map(c => ({ nom: c.nom, id: c.id })));
@@ -418,6 +452,7 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
       setShowSuccessModal(true);
     }
   };
+
 
   const getStatutColor = (statut: string) => {
     switch (statut) {

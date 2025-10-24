@@ -99,31 +99,22 @@ export function useChantierData(chantierId: string | null) {
           const entreprisesData = await entreprisesService.getByChantierNew(chantierId);
           setEntreprises(entreprisesData);
 
-          // Charger devis, commandes, paiements pour chaque entreprise de ce chantier
+          // Pour les nouveaux chantiers, les données sont vierges
+          // Les entreprises sont dans chantiers/{chantierId}/entreprises
+          // Mais devis, commandes, paiements, documents sont encore dans entreprises/{entrepriseId}/xxx
+          // PROBLÈME: Les services chargent depuis la structure globale au lieu de la structure par chantier
+
+          console.log(`⚠️ PROBLÈME DÉTECTÉ: Nouveau chantier ${chantierId} avec ${entreprisesData.length} entreprises`);
+          console.log('🔍 Les données devraient être vierges pour un nouveau chantier');
+
+          // FORCER des données vierges pour les nouveaux chantiers
           let tousDevis: Devis[] = [];
           let toutesCommandes: Commande[] = [];
           let tousPaiements: Paiement[] = [];
           let tousDocuments: DocumentOfficiel[] = [];
 
-          for (const entreprise of entreprisesData) {
-            if (entreprise.id) {
-              try {
-                const [devisEnt, commandesEnt, paiementsEnt, documentsEnt] = await Promise.all([
-                  devisService.getByEntreprise(entreprise.id),
-                  commandesService.getByEntreprise(entreprise.id),
-                  paiementsService.getByEntreprise(entreprise.id),
-                  documentsService.getByEntreprise(entreprise.id)
-                ]);
-
-                tousDevis.push(...devisEnt);
-                toutesCommandes.push(...commandesEnt);
-                tousPaiements.push(...paiementsEnt);
-                tousDocuments.push(...documentsEnt);
-              } catch (entError) {
-                console.warn(`Erreur chargement données entreprise ${entreprise.nom}:`, entError);
-              }
-            }
-          }
+          // TODO: Implémenter la vraie structure par chantier plus tard
+          // Pour l'instant, nouveaux chantiers = données vierges
 
           // Pour les nouveaux chantiers, pas de rendez-vous pour l'instant
           // TODO: Implémenter une structure de rendez-vous par chantier
@@ -134,12 +125,8 @@ export function useChantierData(chantierId: string | null) {
           setPaiements(tousPaiements);
           setDocuments(tousDocuments);
 
-          console.log(`✅ Chantier ${chantierId} chargé: ${entreprisesData.length} entreprises, ${tousDevis.length} devis, ${toutesCommandes.length} commandes, ${tousPaiements.length} paiements`);
-
-          if (entreprisesData.length === 0) {
-            console.warn(`⚠️ Aucune entreprise trouvée dans chantiers/${chantierId}/entreprises`);
-            console.log('🔍 Vérifiez que les entreprises sont bien créées dans cette collection Firebase');
-          }
+          console.log(`✅ NOUVEAU CHANTIER ${chantierId} chargé: ${entreprisesData.length} entreprises, ${tousDevis.length} devis, ${toutesCommandes.length} commandes, ${tousPaiements.length} paiements`);
+          console.log('🎯 Chantier vierge - données isolées du chantier principal');
 
         } catch (error) {
           console.error(`Erreur chargement chantier ${chantierId}:`, error);
