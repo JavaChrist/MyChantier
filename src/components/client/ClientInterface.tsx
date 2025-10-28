@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { MessageCircle, Calendar, FileText, CreditCard, LogOut, User, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { useChantierData } from '../../hooks/useChantierData';
-import { ChantierChat } from '../chat/ChantierChat';
+import { ClientChat } from './ClientChat';
 import { ClientDocuments } from './ClientDocuments';
 import { ClientPlanning } from './ClientPlanning';
 import { ClientPaiements } from './ClientPaiements';
@@ -280,22 +280,3 @@ function ClientOverview({ stats, entreprises, devis, onNavigate }: any) {
   );
 }
 
-// Chat client (utilise le composant dédié)
-function ClientChat({ chantierId, userProfile }: any) {
-  // Simuler un chantier pour le chat
-  const mockChantier = {
-    id: chantierId,
-    nom: 'Mon Chantier',
-    clientNom: userProfile.displayName,
-    adresse: 'Votre chantier'
-  };
-
-  return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-      <h2 className="text-xl font-semibold text-gray-800 mb-4">Messages avec votre professionnel</h2>
-      <div className="text-gray-600">
-        Interface de chat client en cours de finalisation...
-      </div>
-    </div>
-  );
-}

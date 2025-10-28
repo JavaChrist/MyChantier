@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, Eye, Play, CheckCircle, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, Eye, Play, CheckCircle, Check, Trash2 } from 'lucide-react';
 import { Icon } from '../Icon';
-import { entreprisesService, commandesService } from '../../firebase/entreprises';
-import { rendezVousService } from '../../firebase/calendar';
 import { useChantier } from '../../contexts/ChantierContext';
 import { useChantierData } from '../../hooks/useChantierData';
-import type { Entreprise, Commande } from '../../firebase/entreprises';
-import type { RendezVous } from '../../firebase/calendar';
+import type { Entreprise, Commande, RendezVous } from '../../firebase/unified-services';
 import { Modal } from '../Modal';
+import { ConfirmModal } from '../ConfirmModal';
 
 type ViewType = 'month' | 'week' | 'day' | 'agenda';
 
@@ -22,13 +20,38 @@ const COULEURS_SECTEURS = {
 
 export function CalendarPlanning() {
   const { chantierId, chantierActuel } = useChantier();
-  const { entreprises, commandes, rendezVous, loading: dataLoading } = useChantierData(chantierId);
+  const { entreprises, commandes, rendezVous, loading: dataLoading, reloadData } = useChantierData(chantierId);
+
+  // DEBUG pour comprendre la structure des rendez-vous après migration
+  useEffect(() => {
+    console.log('🔍 DEBUG PLANNING PROFESSIONNEL:', {
+      chantierId: chantierId,
+      total: rendezVous.length,
+      premier: rendezVous[0],
+      entreprises: entreprises.length
+    });
+
+    if (rendezVous.length > 0) {
+      console.log('📅 Premiers rendez-vous:', rendezVous.slice(0, 3).map(rv => ({
+        titre: rv.titre,
+        dateDebut: rv.dateDebut,
+        dateHeure: rv.dateHeure,
+        entrepriseId: rv.entrepriseId,
+        type: rv.type
+      })));
+    } else {
+      console.log('⚠️ Aucun rendez-vous trouvé pour le planning');
+    }
+  }, [rendezVous.length, chantierId, entreprises.length]);
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewType, setViewType] = useState<ViewType>('month');
   const [showEventModal, setShowEventModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<RendezVous | null>(null);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Plus besoin de loadData car useChantierData s'en charge
 
@@ -52,8 +75,18 @@ export function CalendarPlanning() {
 
   const getEntrepriseCouleur = (entrepriseId: string) => {
     const entreprise = entreprises.find(e => e.id === entrepriseId);
-    if (!entreprise) return COULEURS_SECTEURS.sanitaire;
-    return COULEURS_SECTEURS[entreprise.secteurActivite] || COULEURS_SECTEURS.sanitaire;
+    if (entreprise) {
+      return COULEURS_SECTEURS[entreprise.secteurActivite] || COULEURS_SECTEURS.sanitaire;
+    }
+
+    // Si pas trouvé par nouvel ID, chercher par ancien ID (migration)
+    const entrepriseByOldId = entreprises.find((e: any) => e.oldId === entrepriseId);
+    if (entrepriseByOldId) {
+      return COULEURS_SECTEURS[entrepriseByOldId.secteurActivite] || COULEURS_SECTEURS.sanitaire;
+    }
+
+    // Par défaut, couleur sanitaire (bleu)
+    return COULEURS_SECTEURS.sanitaire;
   };
 
   const getEventsForDate = (date: Date) => {
@@ -67,6 +100,14 @@ export function CalendarPlanning() {
     }> = [];
 
     const dateStr = date.toDateString();
+
+    // DEBUG pour comprendre pourquoi les rendez-vous ne s'affichent pas
+    if (rendezVous.length > 0 && date.getDate() === new Date().getDate()) {
+      console.log(`🔍 getEventsForDate(${dateStr}):`, {
+        rendezVousTotal: rendezVous.length,
+        premierRdv: rendezVous[0]
+      });
+    }
 
     // Ajouter les débuts de commandes
     commandes.forEach(commande => {
@@ -91,15 +132,19 @@ export function CalendarPlanning() {
       }
     });
 
-    // Ajouter les rendez-vous
+    // Ajouter les rendez-vous (structure V2)
     rendezVous.forEach(rdv => {
-      if (rdv.dateHeure.toDateString() === dateStr) {
-        const confirmationIcon = rdv.confirme ? '✓ ' : '⏳ ';
+      // Gestion de la nouvelle structure (dateDebut/dateFin) et ancienne (dateHeure)
+      const rdvDate = rdv.dateDebut || rdv.dateHeure;
+      if (rdvDate && rdvDate.toDateString() === dateStr) {
+        const statusIcon = rdv.statut === 'confirme' ? '✓ ' :
+          rdv.statut === 'termine' ? '✅ ' :
+            rdv.confirme ? '✓ ' : '⏳ ';
         events.push({
           id: `rdv-${rdv.id}`,
           type: 'rendez-vous',
-          title: `${confirmationIcon}${rdv.titre}`,
-          time: rdv.dateHeure.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+          title: `${statusIcon}${rdv.titre}`,
+          time: rdvDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
           entrepriseId: rdv.entrepriseId,
           data: rdv
         });
@@ -124,36 +169,122 @@ export function CalendarPlanning() {
   };
 
   const handleEventClick = (event: any) => {
-    if (event.type === 'rendez-vous') {
-      setSelectedEvent(event.data);
-      setSelectedDate(null);
-      setShowEventModal(true);
+    try {
+      if (event.type === 'rendez-vous' && event.data) {
+        console.log('🔍 Clic sur rendez-vous:', event.data);
+
+        // Adapter la structure V2 pour la modale
+        const adaptedEvent = {
+          ...event.data,
+          // Assurer la compatibilité avec l'ancienne structure
+          dateHeure: event.data.dateDebut || event.data.dateHeure,
+          confirme: event.data.statut === 'confirme' || event.data.confirme || false
+        };
+
+        setSelectedEvent(adaptedEvent);
+        setSelectedDate(null);
+        setShowEventModal(true);
+      }
+    } catch (error) {
+      console.error('❌ Erreur handleEventClick:', error);
+      // Ne pas ouvrir la modale si erreur
     }
   };
 
   const handleSaveEvent = async (eventData: Omit<RendezVous, 'id'>) => {
     try {
+      if (!chantierId) {
+        console.error('Aucun chantier sélectionné');
+        return;
+      }
+
+      // Adapter pour la structure V2
       const finalEventData = {
         ...eventData,
-        dateCreation: eventData.dateCreation || new Date(),
-        confirme: eventData.confirme || false
+        // Convertir dateHeure vers dateDebut/dateFin si nécessaire
+        dateDebut: eventData.dateDebut || eventData.dateHeure || new Date(),
+        dateFin: eventData.dateFin || (eventData.dateHeure ? new Date(eventData.dateHeure.getTime() + 60 * 60 * 1000) : new Date()),
+        // Convertir confirme vers statut
+        statut: eventData.confirme ? 'confirme' : (eventData.statut || 'planifie')
       };
 
+      const { unifiedPlanningService } = await import('../../firebase/unified-services');
+
       if (selectedEvent?.id) {
-        await rendezVousService.update(selectedEvent.id, finalEventData);
+        await unifiedPlanningService.update(chantierId, selectedEvent.id, finalEventData);
+        console.log('✅ Rendez-vous modifié en V2');
       } else {
-        await rendezVousService.create(finalEventData);
+        await unifiedPlanningService.create(chantierId, finalEventData);
+        console.log('✅ Nouveau rendez-vous créé en V2');
       }
-      // Les données se rechargent automatiquement via useChantierData
+
+      // Forcer le rechargement des données
+      if (reloadData) {
+        await reloadData();
+        console.log('🔄 Données rechargées après création/modification');
+      }
+
       setShowEventModal(false);
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
-      // En cas d'erreur de connexion, on ferme quand même la modale
-      // Les données seront synchronisées quand la connexion reviendra
-      if (error.message && error.message.includes('ERR_INTERNET_DISCONNECTED')) {
-        console.log('Sauvegarde en attente de connexion...');
-        setShowEventModal(false);
+      setShowEventModal(false);
+    }
+  };
+
+  const handleDeleteEvent = async () => {
+    if (!selectedEvent?.id) return;
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteEvent = async () => {
+    if (!selectedEvent?.id || !chantierId) return;
+
+    try {
+      const { unifiedPlanningService } = await import('../../firebase/unified-services');
+      await unifiedPlanningService.delete(chantierId, selectedEvent.id);
+
+      console.log('✅ Rendez-vous supprimé en V2');
+
+      // Forcer le rechargement des données
+      if (reloadData) {
+        await reloadData();
+        console.log('🔄 Données rechargées après suppression');
       }
+
+      setShowEventModal(false);
+      setSelectedEvent(null);
+      setShowDeleteConfirm(false);
+
+      setSuccessMessage(`Rendez-vous "${selectedEvent.titre}" supprimé avec succès !`);
+      setShowSuccessMessage(true);
+
+    } catch (error) {
+      console.error('Erreur suppression rendez-vous:', error);
+      setSuccessMessage(`❌ Erreur lors de la suppression : ${error.message}`);
+      setShowSuccessMessage(true);
+    }
+  };
+
+  const handleFixRendezVousLinks = async () => {
+    if (!chantierId) return;
+
+    try {
+      const { fixRendezVousEntreprises } = await import('../../utils/fixRendezVous');
+
+      console.log('🔄 Début de la correction des liens...');
+      const correctionCount = await fixRendezVousEntreprises(chantierId);
+
+      if (correctionCount > 0) {
+        setSuccessMessage(`✅ Correction terminée !\n\n${correctionCount} rendez-vous ont été reliés aux bonnes entreprises.\n\nRechargez la page pour voir les couleurs corrigées.`);
+      } else {
+        setSuccessMessage('ℹ️ Aucune correction nécessaire.\n\nTous les liens semblent déjà corrects.');
+      }
+      setShowSuccessMessage(true);
+
+    } catch (error) {
+      console.error('❌ Erreur correction:', error);
+      setSuccessMessage(`❌ Erreur lors de la correction :\n${error.message}`);
+      setShowSuccessMessage(true);
     }
   };
 
@@ -180,14 +311,25 @@ export function CalendarPlanning() {
             }
           </p>
         </div>
-        <button
-          onClick={() => handleDateClick(new Date())}
-          className="btn-primary flex items-center space-x-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Nouveau RDV</span>
-          <span className="sm:hidden">RDV</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => handleDateClick(new Date())}
+            className="btn-primary flex items-center space-x-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Nouveau RDV</span>
+            <span className="sm:hidden">RDV</span>
+          </button>
+
+          <button
+            onClick={handleFixRendezVousLinks}
+            className="btn-secondary flex items-center space-x-2 bg-orange-600 hover:bg-orange-700 text-white"
+          >
+            <Check className="w-4 h-4" />
+            <span className="hidden sm:inline">Corriger liens</span>
+            <span className="sm:hidden">Fix</span>
+          </button>
+        </div>
       </div>
 
       {/* Contrôles de navigation */}
@@ -250,10 +392,18 @@ export function CalendarPlanning() {
 
       {/* Vue calendrier */}
       <div className="card">
-        {viewType === 'month' && <MonthView currentDate={currentDate} getEventsForDate={getEventsForDate} getEntrepriseCouleur={getEntrepriseCouleur} onDateClick={handleDateClick} onEventClick={handleEventClick} />}
-        {viewType === 'week' && <WeekView currentDate={currentDate} getEventsForDate={getEventsForDate} getEntrepriseCouleur={getEntrepriseCouleur} onDateClick={handleDateClick} onEventClick={handleEventClick} />}
-        {viewType === 'day' && <DayView currentDate={currentDate} getEventsForDate={getEventsForDate} getEntrepriseCouleur={getEntrepriseCouleur} onDateClick={handleDateClick} onEventClick={handleEventClick} entreprises={entreprises} />}
-        {viewType === 'agenda' && <AgendaView rendezVous={rendezVous} commandes={commandes} entreprises={entreprises} getEntrepriseCouleur={getEntrepriseCouleur} onEventClick={handleEventClick} onDateClick={handleDateClick} />}
+        {dataLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-gray-400">Chargement du planning...</div>
+          </div>
+        ) : (
+          <>
+            {viewType === 'month' && <MonthView currentDate={currentDate} getEventsForDate={getEventsForDate} getEntrepriseCouleur={getEntrepriseCouleur} onDateClick={handleDateClick} onEventClick={handleEventClick} />}
+            {viewType === 'week' && <WeekView currentDate={currentDate} getEventsForDate={getEventsForDate} getEntrepriseCouleur={getEntrepriseCouleur} onDateClick={handleDateClick} onEventClick={handleEventClick} />}
+            {viewType === 'day' && <DayView currentDate={currentDate} getEventsForDate={getEventsForDate} getEntrepriseCouleur={getEntrepriseCouleur} onDateClick={handleDateClick} onEventClick={handleEventClick} entreprises={entreprises} />}
+            {viewType === 'agenda' && <AgendaView rendezVous={rendezVous} commandes={commandes} entreprises={entreprises} getEntrepriseCouleur={getEntrepriseCouleur} onEventClick={handleEventClick} onDateClick={handleDateClick} />}
+          </>
+        )}
       </div>
 
       {/* Modal pour créer/modifier un rendez-vous */}
@@ -263,14 +413,53 @@ export function CalendarPlanning() {
         title={selectedEvent ? 'Modifier le rendez-vous' : 'Nouveau rendez-vous'}
         size="lg"
       >
-        <RendezVousForm
-          rendezVous={selectedEvent}
-          entreprises={entreprises}
-          selectedDate={selectedDate}
-          onSave={handleSaveEvent}
-          onCancel={() => setShowEventModal(false)}
-        />
+        {showEventModal && (
+          <RendezVousForm
+            rendezVous={selectedEvent}
+            entreprises={entreprises}
+            selectedDate={selectedDate}
+            onSave={handleSaveEvent}
+            onCancel={() => setShowEventModal(false)}
+            onDelete={selectedEvent ? handleDeleteEvent : undefined}
+          />
+        )}
       </Modal>
+
+      {/* Modal de succès */}
+      <Modal
+        isOpen={showSuccessMessage}
+        onClose={() => setShowSuccessMessage(false)}
+        title="✅ Correction des liens"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="bg-green-600/10 border border-green-600/20 rounded-lg p-4">
+            <pre className="text-sm text-green-400 whitespace-pre-wrap font-sans">
+              {successMessage}
+            </pre>
+          </div>
+          <div className="flex justify-end">
+            <button
+              onClick={() => setShowSuccessMessage(false)}
+              className="btn-primary"
+            >
+              Compris
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal de confirmation de suppression */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onConfirm={confirmDeleteEvent}
+        onCancel={() => setShowDeleteConfirm(false)}
+        title="Supprimer le rendez-vous"
+        message={selectedEvent ? `Supprimer le rendez-vous "${selectedEvent.titre}" ?\n\nCette action est irréversible.` : ''}
+        confirmText="Supprimer"
+        cancelText="Annuler"
+        type="danger"
+      />
     </div>
   );
 }
@@ -531,13 +720,15 @@ function RendezVousForm({
   entreprises,
   selectedDate,
   onSave,
-  onCancel
+  onCancel,
+  onDelete
 }: {
   rendezVous: RendezVous | null;
   entreprises: Entreprise[];
   selectedDate: Date | null;
   onSave: (rdv: Omit<RendezVous, 'id'>) => void;
   onCancel: () => void;
+  onDelete?: () => void;
 }) {
   const [formData, setFormData] = useState({
     titre: '',
@@ -553,16 +744,19 @@ function RendezVousForm({
 
   useEffect(() => {
     if (rendezVous) {
+      // Gestion structure V2 (dateDebut) et ancienne (dateHeure)
+      const rdvDate = rendezVous.dateDebut || rendezVous.dateHeure || new Date();
+
       setFormData({
-        titre: rendezVous.titre,
-        entrepriseId: rendezVous.entrepriseId,
-        date: rendezVous.dateHeure.toISOString().split('T')[0],
-        heure: rendezVous.dateHeure.toTimeString().slice(0, 5),
-        lieu: rendezVous.lieu,
-        type: rendezVous.type,
+        titre: rendezVous.titre || '',
+        entrepriseId: rendezVous.entrepriseId || '',
+        date: rdvDate.toISOString().split('T')[0],
+        heure: rdvDate.toTimeString().slice(0, 5),
+        lieu: rendezVous.lieu || '',
+        type: rendezVous.type || 'visite-chantier',
         notes: rendezVous.notes || '',
-        statut: rendezVous.statut,
-        confirme: rendezVous.confirme || false
+        statut: rendezVous.statut || 'planifie',
+        confirme: rendezVous.statut === 'confirme' || rendezVous.confirme || false
       });
     } else if (selectedDate) {
       setFormData(prev => ({
@@ -758,21 +952,37 @@ function RendezVousForm({
       </form>
 
       {/* Actions - En dehors du scroll pour rester visibles */}
-      <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-700 bg-gray-800 sticky bottom-0">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="btn-secondary"
-        >
-          Annuler
-        </button>
-        <button
-          type="submit"
-          form="rendez-vous-form"
-          className="btn-primary"
-        >
-          {rendezVous ? 'Modifier' : 'Créer'}
-        </button>
+      <div className="flex items-center justify-between pt-4 border-t border-gray-700 bg-gray-800 sticky bottom-0">
+        <div>
+          {/* Bouton de suppression (seulement pour modification) */}
+          {rendezVous && onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="btn-secondary flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Supprimer</span>
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center space-x-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="btn-secondary"
+          >
+            Annuler
+          </button>
+          <button
+            type="submit"
+            form="rendez-vous-form"
+            className="btn-primary"
+          >
+            {rendezVous ? 'Modifier' : 'Créer'}
+          </button>
+        </div>
       </div>
     </div>
   );

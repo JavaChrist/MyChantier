@@ -4,11 +4,13 @@ import {
   Users,
   Calendar,
   CreditCard,
-  Shield
+  Shield,
+  MessageCircle,
+  CheckSquare
 } from 'lucide-react';
 
 interface NavigationIconProps {
-  type: 'dashboard' | 'entreprises' | 'prestations' | 'planning' | 'paiements' | 'documents';
+  type: 'dashboard' | 'entreprises' | 'prestations' | 'planning' | 'etapes' | 'paiements' | 'documents' | 'chat';
   isActive?: boolean;
   size?: number;
 }
@@ -35,6 +37,11 @@ const ICON_CONFIG = {
     bgColor: 'bg-purple-500',
     textColor: 'text-white'
   },
+  etapes: {
+    icon: CheckSquare,
+    bgColor: 'bg-indigo-600',
+    textColor: 'text-white'
+  },
   paiements: {
     icon: CreditCard,
     bgColor: 'bg-orange-500',
@@ -43,6 +50,11 @@ const ICON_CONFIG = {
   documents: {
     icon: Shield,
     bgColor: 'bg-emerald-600',
+    textColor: 'text-white'
+  },
+  chat: {
+    icon: MessageCircle,
+    bgColor: 'bg-purple-500',
     textColor: 'text-white'
   }
 };

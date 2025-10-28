@@ -32,11 +32,14 @@ export function useAuth() {
             displayName = emailPart.charAt(0).toUpperCase() + emailPart.slice(1).replace(/[._]/g, ' ');
           }
 
+          // Déterminer le rôle automatiquement
+          const role = user.email === 'contact@javachrist.fr' ? 'professional' : 'client';
+
           const fallbackProfile: UserProfile = {
             uid: user.uid,
             email: user.email || '',
-            displayName: displayName || 'Professionnel',
-            role: 'professional',
+            displayName: displayName || (role === 'professional' ? 'Professionnel' : 'Client'),
+            role: role,
             dateCreation: new Date(),
             derniereConnexion: new Date()
           };

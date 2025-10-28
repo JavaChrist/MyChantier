@@ -23,8 +23,9 @@ const navItems = [
   { id: 'entreprises', label: 'Entreprises', iconType: 'entreprises' as const },
   { id: 'prestations', label: 'Prestations', iconType: 'prestations' as const },
   { id: 'planning', label: 'Planning', iconType: 'planning' as const },
+  { id: 'etapes', label: 'Étapes', iconType: 'etapes' as const },
   { id: 'paiements', label: 'Paiements', iconType: 'paiements' as const },
-  { id: 'assurances', label: 'Documents', iconType: 'documents' as const },
+  { id: 'assurances', label: 'Documents', iconType: 'documents' as const }
 ];
 
 export function Navigation({ currentView, onViewChange, userProfile, onLogout }: NavigationProps) {

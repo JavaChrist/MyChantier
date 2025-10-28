@@ -105,9 +105,13 @@ export const authService = {
   // Récupérer le profil utilisateur
   async getUserProfile(uid: string): Promise<UserProfile | null> {
     try {
+      console.log('🔍 Recherche profil pour UID:', uid);
       const docSnap = await getDoc(doc(db, 'users', uid));
+
       if (docSnap.exists()) {
+        console.log('✅ Profil trouvé dans Firestore');
         const data = docSnap.data();
+        console.log('📋 Données profil:', { email: data.email, role: data.role, chantierId: data.chantierId });
 
         // Gestion sécurisée des dates
         let dateCreation = new Date();
@@ -154,7 +158,7 @@ export const authService = {
         } as UserProfile;
       } else {
         // L'utilisateur existe dans Firebase Auth mais pas dans Firestore
-        // Créer automatiquement le profil
+        console.log('❌ Aucun profil trouvé dans Firestore pour UID:', uid);
         console.log('🔧 Création automatique du profil utilisateur manquant');
 
         // Récupérer les informations de l'utilisateur Firebase Auth
@@ -168,11 +172,14 @@ export const authService = {
             displayName = emailPart.charAt(0).toUpperCase() + emailPart.slice(1).replace(/[._]/g, ' ');
           }
 
+          // Déterminer le rôle automatiquement
+          const role = user.email === 'contact@javachrist.fr' ? 'professional' : 'client';
+
           const newProfile: UserProfile = {
             uid: user.uid,
             email: user.email || '',
-            displayName: displayName || 'Professionnel',
-            role: 'professional', // Par défaut professionnel
+            displayName: displayName || (role === 'professional' ? 'Professionnel' : 'Client'),
+            role: role,
             dateCreation: new Date(),
             derniereConnexion: new Date()
           };

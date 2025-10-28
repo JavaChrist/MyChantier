@@ -6,6 +6,7 @@ import { Dashboard } from './components/Dashboard';
 import { EntreprisesManager } from './components/entreprises/EntreprisesManager';
 import { PrestationsManager } from './components/prestations/PrestationsManager';
 import { CalendarPlanning } from './components/planning/CalendarPlanning';
+import { EtapesManager } from './components/etapes/EtapesManager';
 import { PaiementsGlobaux } from './components/paiements/PaiementsGlobaux';
 import { AssurancesManager } from './components/assurances/AssurancesManager';
 import { PWAPrompt } from './components/PWAPrompt';
@@ -13,6 +14,7 @@ import { UpdatePrompt } from './components/UpdatePrompt';
 import { ChantierProvider, useChantier } from './contexts/ChantierContext';
 import { ChantierSelector } from './components/chantiers/ChantierSelector';
 import { ChantierHeader } from './components/chantiers/ChantierHeader';
+import { ChantierChat } from './components/chat/ChantierChat';
 import { LoginForm } from './components/auth/LoginForm';
 import { useAuth } from './hooks/useAuth';
 import { ClientInterface } from './components/client/ClientInterface';
@@ -46,6 +48,8 @@ function AppContent({ userProfile, onLogout }: { userProfile: any; onLogout: () 
         return <PrestationsManager />;
       case 'planning':
         return <CalendarPlanning />;
+      case 'etapes':
+        return <EtapesManager />;
       case 'paiements':
         return <PaiementsGlobaux />;
       case 'assurances':
@@ -212,34 +216,8 @@ function ClientApp({ userProfile, onLogout }: { userProfile: any; onLogout: () =
     );
   }
 
-  // Vérifier si le chantier du client existe encore
-  if (userProfile?.chantierId && userProfile.chantierId.startsWith('chantier-') && userProfile.chantierId !== 'chantier-principal') {
-    // Ce client était lié à un chantier qui a été supprimé
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-        <div className="max-w-md w-full text-center space-y-6">
-          <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center mx-auto">
-            <AlertTriangle className="w-8 h-8 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-100 mb-2">Chantier non disponible</h1>
-            <p className="text-gray-400 mb-4">
-              Le chantier associé à votre compte ({userProfile.chantierId}) n'est plus disponible.
-            </p>
-            <p className="text-sm text-gray-500 mb-6">
-              Contactez votre professionnel pour qu'il vous associe à un nouveau chantier.
-            </p>
-          </div>
-          <button
-            onClick={onLogout}
-            className="btn-primary w-full"
-          >
-            Se déconnecter
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Tous les chantiers sont maintenant valides avec la structure V2
+  // Plus besoin de vérifier si le chantier existe, la structure V2 gère cela automatiquement
 
   return (
     <ChantierProvider>

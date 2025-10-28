@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
-import { entreprisesService, devisService, commandesService, paiementsService } from '../firebase/entreprises';
-import { documentsService } from '../firebase/documents';
-import { rendezVousService } from '../firebase/calendar';
-import type { Entreprise, Devis, Commande, Paiement } from '../firebase/entreprises';
-import type { DocumentOfficiel } from '../firebase/documents';
-import type { RendezVous } from '../firebase/calendar';
+import {
+  unifiedEntreprisesService,
+  unifiedDevisService,
+  unifiedCommandesService,
+  unifiedPaiementsService,
+  unifiedDocumentsService,
+  unifiedPlanningService
+} from '../firebase/unified-services';
+import type { Entreprise, Devis, Commande, Paiement, DocumentOfficiel, RendezVous } from '../firebase/unified-services';
 
 // Hook pour charger toutes les données d'un chantier
 export function useChantierData(chantierId: string | null) {
@@ -39,111 +42,44 @@ export function useChantierData(chantierId: string | null) {
       setLoading(true);
       setError(null);
 
-      console.log(`🔍 CHARGEMENT DONNÉES pour chantier: ${chantierId}`);
+      console.log(`🔍 CHARGEMENT V2 pour chantier: ${chantierId}`);
 
-      // Chargement selon le type de chantier
-      if (chantierId === 'chantier-principal') {
-        // CHANTIER PRINCIPAL = Anciennes données (structure globale)
-        try {
-          console.log('📊 Chargement données chantier principal (structure globale)');
+      // STRUCTURE UNIFIÉE V2 - Tous les chantiers utilisent la même logique
+      const [entreprisesData, devisData, commandesData, paiementsData, documentsData, planningData] = await Promise.all([
+        unifiedEntreprisesService.getByChantier(chantierId),
+        unifiedDevisService.getByChantier(chantierId),
+        unifiedCommandesService.getByChantier(chantierId),
+        unifiedPaiementsService.getByChantier(chantierId),
+        unifiedDocumentsService.getByChantier(chantierId),
+        unifiedPlanningService.getByChantier(chantierId)
+      ]);
 
-          const [entreprisesData, rendezVousData] = await Promise.all([
-            entreprisesService.getAll(),
-            rendezVousService.getAll()
-          ]);
+      setEntreprises(entreprisesData);
+      setDevis(devisData);
+      setCommandes(commandesData);
+      setPaiements(paiementsData);
+      setDocuments(documentsData);
+      setRendezVous(planningData);
 
-          // Charger devis, commandes, paiements, documents pour chaque entreprise
-          let tousDevis: Devis[] = [];
-          let toutesCommandes: Commande[] = [];
-          let tousPaiements: Paiement[] = [];
-          let tousDocuments: DocumentOfficiel[] = [];
-
-          for (const entreprise of entreprisesData) {
-            if (entreprise.id) {
-              const [devisEnt, commandesEnt, paiementsEnt, documentsEnt] = await Promise.all([
-                devisService.getByEntreprise(entreprise.id),
-                commandesService.getByEntreprise(entreprise.id),
-                paiementsService.getByEntreprise(entreprise.id),
-                documentsService.getByEntreprise(entreprise.id)
-              ]);
-
-              tousDevis.push(...devisEnt);
-              toutesCommandes.push(...commandesEnt);
-              tousPaiements.push(...paiementsEnt);
-              tousDocuments.push(...documentsEnt);
-            }
-          }
-
-          setEntreprises(entreprisesData.map(ent => ({ ...ent, chantierId: 'chantier-principal' })));
-          setDevis(tousDevis);
-          setCommandes(toutesCommandes);
-          setPaiements(tousPaiements);
-          setDocuments(tousDocuments);
-          setRendezVous(rendezVousData);
-
-        } catch (error) {
-          console.error('Erreur chargement données chantier principal:', error);
-          setEntreprises([]);
-          setDevis([]);
-          setCommandes([]);
-          setPaiements([]);
-          setDocuments([]);
-          setRendezVous([]);
-        }
-      } else {
-        // NOUVEAUX CHANTIERS = Structure par chantier
-        try {
-          console.log(`📊 Chargement données chantier ${chantierId} (structure par chantier)`);
-
-          // Charger les entreprises du chantier
-          const entreprisesData = await entreprisesService.getByChantierNew(chantierId);
-          setEntreprises(entreprisesData);
-
-          // Pour les nouveaux chantiers, les données sont vierges
-          // Les entreprises sont dans chantiers/{chantierId}/entreprises
-          // Mais devis, commandes, paiements, documents sont encore dans entreprises/{entrepriseId}/xxx
-          // PROBLÈME: Les services chargent depuis la structure globale au lieu de la structure par chantier
-
-          console.log(`⚠️ PROBLÈME DÉTECTÉ: Nouveau chantier ${chantierId} avec ${entreprisesData.length} entreprises`);
-          console.log('🔍 Les données devraient être vierges pour un nouveau chantier');
-
-          // FORCER des données vierges pour les nouveaux chantiers
-          let tousDevis: Devis[] = [];
-          let toutesCommandes: Commande[] = [];
-          let tousPaiements: Paiement[] = [];
-          let tousDocuments: DocumentOfficiel[] = [];
-
-          // TODO: Implémenter la vraie structure par chantier plus tard
-          // Pour l'instant, nouveaux chantiers = données vierges
-
-          // Pour les nouveaux chantiers, pas de rendez-vous pour l'instant
-          // TODO: Implémenter une structure de rendez-vous par chantier
-          setRendezVous([]);
-
-          setDevis(tousDevis);
-          setCommandes(toutesCommandes);
-          setPaiements(tousPaiements);
-          setDocuments(tousDocuments);
-
-          console.log(`✅ NOUVEAU CHANTIER ${chantierId} chargé: ${entreprisesData.length} entreprises, ${tousDevis.length} devis, ${toutesCommandes.length} commandes, ${tousPaiements.length} paiements`);
-          console.log('🎯 Chantier vierge - données isolées du chantier principal');
-
-        } catch (error) {
-          console.error(`Erreur chargement chantier ${chantierId}:`, error);
-          // Chantier vierge en cas d'erreur
-          setEntreprises([]);
-          setDevis([]);
-          setCommandes([]);
-          setPaiements([]);
-          setDocuments([]);
-          setRendezVous([]);
-        }
-      }
+      console.log(`✅ CHANTIER V2 ${chantierId} chargé:`, {
+        entreprises: entreprisesData.length,
+        devis: devisData.length,
+        commandes: commandesData.length,
+        paiements: paiementsData.length,
+        documents: documentsData.length,
+        planning: planningData.length
+      });
 
     } catch (error) {
-      console.error('Erreur chargement données chantier:', error);
+      console.error('Erreur chargement données chantier V2:', error);
       setError('Erreur lors du chargement des données');
+      // Données vierges en cas d'erreur
       setEntreprises([]);
+      setDevis([]);
+      setCommandes([]);
+      setPaiements([]);
+      setDocuments([]);
+      setRendezVous([]);
     } finally {
       setLoading(false);
     }

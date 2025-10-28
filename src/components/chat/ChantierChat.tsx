@@ -1,19 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Send, MessageCircle, User, Clock, FileText, AlertCircle, CheckCircle } from 'lucide-react';
 import { useChantier } from '../../contexts/ChantierContext';
+import { unifiedMessagesService, type Message } from '../../firebase/unified-services';
 
-interface Message {
-  id: string;
-  sender: 'professional' | 'client';
-  senderName: string;
-  content: string;
-  timestamp: Date;
-  type: 'text' | 'decision' | 'validation';
-  isRead: boolean;
-}
 
 export function ChantierChat() {
   const { chantierActuel } = useChantier();
+
+  // Détecter le type d'utilisateur depuis l'URL ou le contexte
+  const isClientInterface = window.location.pathname.includes('/client') ||
+    document.querySelector('[data-client-interface]') !== null ||
+    // Détecter si on est dans l'interface client par la structure DOM
+    document.querySelector('.bg-gray-50') !== null;
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [showValidationModal, setShowValidationModal] = useState(false);
@@ -25,46 +23,19 @@ export function ChantierChat() {
     }
   }, [chantierActuel]);
 
-  const loadMessagesForChantier = (chantierId: string) => {
+  const loadMessagesForChantier = async (chantierId: string) => {
     try {
-      // Charger les messages sauvegardés pour ce chantier
-      const savedMessages = localStorage.getItem(`messages-${chantierId}`);
+      console.log(`🔍 Chargement messages Firebase V2 pour ${chantierId}`);
 
-      if (savedMessages) {
-        const parsedMessages = JSON.parse(savedMessages);
-        // Reconstituer les dates
-        const messagesWithDates = parsedMessages.map((msg: any) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp)
-        }));
-        setMessages(messagesWithDates);
-      } else if (chantierId === 'chantier-principal') {
-        // Messages de démonstration pour le chantier principal seulement
-        const demoMessages = [
-          {
-            id: '1',
-            sender: 'client' as const,
-            senderName: chantierActuel?.clientNom || 'Client',
-            content: 'Bonjour, j\'aimerais avoir des nouvelles sur l\'avancement des travaux de rénovation.',
-            timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-            type: 'text' as const,
-            isRead: true
-          },
-          {
-            id: '2',
-            sender: 'professional' as const,
-            senderName: 'Christian',
-            content: 'Bonjour ! Les travaux avancent très bien. Le plombier a terminé la pose des conduites hier, et l\'électricien commence demain.',
-            timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000),
-            type: 'text' as const,
-            isRead: true
-          }
-        ];
-        setMessages(demoMessages);
-        saveMessagesForChantier(chantierId, demoMessages);
-      } else {
-        // Nouveaux chantiers = pas de messages
-        setMessages([]);
+      const messagesData = await unifiedMessagesService.getByChantier(chantierId);
+      setMessages(messagesData);
+
+      console.log(`✅ ${messagesData.length} messages chargés depuis Firebase V2`);
+
+      // Si aucun message, créer les messages de bienvenue
+      if (messagesData.length === 0) {
+        console.log('🔄 Création des messages de bienvenue...');
+        await createWelcomeMessages(chantierId);
       }
     } catch (error) {
       console.error('Erreur chargement messages:', error);
@@ -72,47 +43,81 @@ export function ChantierChat() {
     }
   };
 
-  const handleSendMessage = () => {
+  const createWelcomeMessages = async (chantierId: string) => {
+    const welcomeMessages = [
+      {
+        sender: 'professional' as const,
+        senderName: 'Administrateur',
+        content: `Bonjour ! Bienvenue sur votre espace de suivi de chantier. Je serai votre interlocuteur pour ce projet.`,
+        timestamp: new Date(Date.now() - 30 * 60 * 1000),
+        type: 'text' as const,
+        isRead: true
+      },
+      {
+        sender: 'professional' as const,
+        senderName: 'Administrateur',
+        content: `N'hésitez pas à me poser vos questions via cette messagerie. Je vous tiendrai informé de l'avancement des travaux.`,
+        timestamp: new Date(Date.now() - 15 * 60 * 1000),
+        type: 'text' as const,
+        isRead: true
+      }
+    ];
+
+    for (const message of welcomeMessages) {
+      await unifiedMessagesService.create(chantierId, message);
+    }
+
+    // Recharger après création
+    await loadMessagesForChantier(chantierId);
+  };
+
+  const handleSendMessage = async () => {
     if (!newMessage.trim() || !chantierActuel) return;
 
-    const message: Message = {
-      id: Date.now().toString(),
-      sender: 'professional',
-      senderName: 'Christian',
-      content: newMessage.trim(),
-      timestamp: new Date(),
-      type: 'text',
-      isRead: false
-    };
+    try {
+      const messageData = {
+        sender: isClientInterface ? 'client' as const : 'professional' as const,
+        senderName: isClientInterface ? (chantierActuel?.clientNom || 'Client') : 'Administrateur',
+        content: newMessage.trim(),
+        timestamp: new Date(),
+        type: 'text' as const,
+        isRead: false
+      };
 
-    setMessages(prev => [...prev, message]);
-    setNewMessage('');
+      await unifiedMessagesService.create(chantierActuel.id!, messageData);
+      console.log('✅ Message envoyé en Firebase V2');
 
-    // Sauvegarder les messages du chantier dans localStorage
-    saveMessagesForChantier(chantierActuel.id!, [...messages, message]);
+      setNewMessage('');
+
+      // Recharger les messages
+      await loadMessagesForChantier(chantierActuel.id!);
+    } catch (error) {
+      console.error('Erreur envoi message:', error);
+    }
   };
 
-  const saveMessagesForChantier = (chantierId: string, messagesData: Message[]) => {
-    localStorage.setItem(`messages-${chantierId}`, JSON.stringify(messagesData));
-  };
 
-  const handleDemanderValidation = (type: string, description: string) => {
+  const handleDemanderValidation = async (type: string, description: string) => {
     if (!chantierActuel) return;
 
-    const validationMessage: Message = {
-      id: Date.now().toString(),
-      sender: 'professional',
-      senderName: 'Christian',
-      content: `Demande de validation: ${description}`,
-      timestamp: new Date(),
-      type: 'validation',
-      isRead: false
-    };
+    try {
+      const validationMessage = {
+        sender: 'professional' as const,
+        senderName: 'Administrateur',
+        content: `Demande de validation: ${description}`,
+        timestamp: new Date(),
+        type: 'validation' as const,
+        isRead: false
+      };
 
-    const newMessages = [...messages, validationMessage];
-    setMessages(newMessages);
-    saveMessagesForChantier(chantierActuel.id!, newMessages);
-    setShowValidationModal(false);
+      await unifiedMessagesService.create(chantierActuel.id!, validationMessage);
+      console.log('✅ Demande de validation envoyée en Firebase V2');
+
+      await loadMessagesForChantier(chantierActuel.id!);
+      setShowValidationModal(false);
+    } catch (error) {
+      console.error('Erreur envoi validation:', error);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -208,8 +213,8 @@ export function ChantierChat() {
             return (
               <div key={message.id} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-xs px-4 py-3 rounded-2xl ${isOwnMessage
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-gray-600 text-gray-100'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-gray-600 text-gray-100'
                   }`}>
                   <div className="flex items-center space-x-2 mb-1">
                     <User className="w-3 h-3" />

@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { Calendar, Clock, CheckCircle, User, MapPin, Phone } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Calendar, Clock, CheckCircle, User, MapPin, Phone, AlertCircle } from 'lucide-react';
 import { useChantierData } from '../../hooks/useChantierData';
+import { unifiedEtapesService, type Etape } from '../../firebase/unified-services';
 
 interface ClientPlanningProps {
   chantierId: string;
@@ -10,7 +11,25 @@ export function ClientPlanning({ chantierId }: ClientPlanningProps) {
   // Utiliser les vraies données du chantier
   const { rendezVous: vraisRendezVous, commandes, entreprises } = useChantierData(chantierId);
 
-  // Données de démonstration pour compléter si pas de vraies données
+  // DEBUG pour comprendre pourquoi les rendez-vous ne s'affichent pas côté client
+  useEffect(() => {
+    console.log('🔍 DEBUG CLIENT PLANNING:', {
+      chantierId: chantierId,
+      rendezVousTotal: vraisRendezVous.length,
+      premier: vraisRendezVous[0]
+    });
+
+    if (vraisRendezVous.length > 0) {
+      console.log('📅 Structure rendez-vous client:', vraisRendezVous.slice(0, 2).map(rv => ({
+        titre: rv.titre,
+        dateDebut: rv.dateDebut,
+        dateHeure: rv.dateHeure,
+        date: rv.date
+      })));
+    }
+  }, [vraisRendezVous, chantierId]);
+
+  // Utiliser les vraies données ou données vierges (plus de démo)
   const [rendezVousDemo] = useState([
     {
       id: '1',
@@ -44,44 +63,34 @@ export function ClientPlanning({ chantierId }: ClientPlanningProps) {
     }
   ]);
 
-  const [etapes] = useState([
-    {
-      id: '1',
-      nom: 'Préparation du chantier',
-      description: 'Préparation et protection des espaces',
-      dateDebut: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-      dateFin: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-      statut: 'terminee',
-      entreprise: 'Préparation'
-    },
-    {
-      id: '2',
-      nom: 'Travaux de plomberie',
-      description: 'Installation des conduites et raccordements',
-      dateDebut: new Date(),
-      dateFin: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      statut: 'en-cours',
-      entreprise: 'Plomberie Martin'
-    },
-    {
-      id: '3',
-      nom: 'Travaux électriques',
-      description: 'Installation électrique et points lumineux',
-      dateDebut: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000),
-      dateFin: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
-      statut: 'planifiee',
-      entreprise: 'Électricité Dupont'
-    },
-    {
-      id: '4',
-      nom: 'Finitions',
-      description: 'Carrelage, peinture et finitions',
-      dateDebut: new Date(Date.now() + 16 * 24 * 60 * 60 * 1000),
-      dateFin: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000),
-      statut: 'planifiee',
-      entreprise: 'Finitions'
+  const [etapes, setEtapes] = useState<any[]>([]);
+
+  // Charger les vraies étapes créées par l'administrateur
+  useEffect(() => {
+    loadEtapes();
+  }, [chantierId, entreprises]);
+
+  const loadEtapes = async () => {
+    if (!chantierId) return;
+
+    try {
+      console.log(`🔍 Client: Chargement étapes Firebase V2 pour ${chantierId}`);
+
+      const etapesData = await unifiedEtapesService.getByChantier(chantierId);
+
+      // Adapter pour l'affichage client
+      const etapesAdaptees = etapesData.map((etape: Etape) => ({
+        ...etape,
+        entreprise: entreprises.find(e => e.id === etape.entrepriseId)?.nom || 'Non assignée'
+      }));
+
+      setEtapes(etapesAdaptees);
+      console.log(`✅ Client: ${etapesAdaptees.length} étapes chargées depuis Firebase V2`);
+    } catch (error) {
+      console.error('Erreur chargement étapes client:', error);
+      setEtapes([]);
     }
-  ]);
+  };
 
   const getStatutEtapeColor = (statut: string) => {
     switch (statut) {
@@ -90,7 +99,10 @@ export function ClientPlanning({ chantierId }: ClientPlanningProps) {
       case 'en-cours':
         return 'bg-blue-500';
       case 'planifiee':
+      case 'planifie': // Compatibilité
         return 'bg-gray-300';
+      case 'en-retard':
+        return 'bg-red-500';
       default:
         return 'bg-gray-300';
     }
@@ -128,8 +140,8 @@ export function ClientPlanning({ chantierId }: ClientPlanningProps) {
 
         {/* Utiliser vraies données + démo si vide */}
         {(() => {
-          const rendezVousAffiches = vraisRendezVous.length > 0 ? vraisRendezVous : rendezVousDemo;
-          const rdvFuturs = rendezVousAffiches.filter(rdv => isFuture(rdv.dateHeure || rdv.date));
+          const rendezVousAffiches = vraisRendezVous; // Utiliser SEULEMENT les vraies données
+          const rdvFuturs = rendezVousAffiches.filter(rdv => isFuture(rdv.dateDebut || rdv.dateHeure || rdv.date));
 
           return rdvFuturs.length === 0 ? (
             <div className="text-center py-8">
@@ -139,9 +151,9 @@ export function ClientPlanning({ chantierId }: ClientPlanningProps) {
           ) : (
             <div className="space-y-4">
               {rdvFuturs
-                .sort((a, b) => (a.dateHeure || a.date).getTime() - (b.dateHeure || b.date).getTime())
+                .sort((a, b) => (a.dateDebut || a.dateHeure || a.date).getTime() - (b.dateDebut || b.dateHeure || b.date).getTime())
                 .map((rdv) => {
-                  const rdvDate = rdv.dateHeure || rdv.date;
+                  const rdvDate = rdv.dateDebut || rdv.dateHeure || rdv.date;
                   const entrepriseNom = rdv.entreprise || entreprises.find(e => e.id === rdv.entrepriseId)?.nom || 'Entreprise';
                   return (
                     <div key={rdv.id} className={`border rounded-xl p-4 ${isToday(rdvDate) ? 'border-primary-300 bg-primary-50' : 'border-gray-200'
@@ -167,7 +179,9 @@ export function ClientPlanning({ chantierId }: ClientPlanningProps) {
                         </div>
                         <div className="flex items-center space-x-2">
                           <Clock className="w-4 h-4 text-gray-500" />
-                          <span className="text-gray-700">{rdv.heure}</span>
+                          <span className="text-gray-700">
+                            {rdv.heure || rdvDate?.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <User className="w-4 h-4 text-gray-500" />
@@ -182,61 +196,63 @@ export function ClientPlanning({ chantierId }: ClientPlanningProps) {
         })()}
       </div>
 
-      {/* Timeline des étapes */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h2 className="text-xl font-semibold text-gray-800 mb-6">Étapes du chantier</h2>
+      {/* Timeline des étapes - Seulement pour les chantiers avec des données */}
+      {vraisRendezVous.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-xl font-semibold text-gray-800 mb-6">Étapes du chantier</h2>
 
-        <div className="space-y-6">
-          {etapes.map((etape, index) => (
-            <div key={etape.id} className="flex items-start space-x-4">
-              {/* Timeline */}
-              <div className="flex flex-col items-center">
-                <div className={`w-10 h-10 rounded-full ${getStatutEtapeColor(etape.statut)} flex items-center justify-center`}>
-                  {getStatutEtapeIcon(etape.statut)}
+          <div className="space-y-6">
+            {etapes.map((etape, index) => (
+              <div key={etape.id} className="flex items-start space-x-4">
+                {/* Timeline */}
+                <div className="flex flex-col items-center">
+                  <div className={`w-10 h-10 rounded-full ${getStatutEtapeColor(etape.statut)} flex items-center justify-center`}>
+                    {getStatutEtapeIcon(etape.statut)}
+                  </div>
+                  {index < etapes.length - 1 && (
+                    <div className="w-0.5 h-12 bg-gray-200 mt-2" />
+                  )}
                 </div>
-                {index < etapes.length - 1 && (
-                  <div className="w-0.5 h-12 bg-gray-200 mt-2" />
-                )}
+
+                {/* Contenu */}
+                <div className="flex-1 pb-6">
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-semibold text-gray-800">{etape.nom}</h3>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${etape.statut === 'terminee' ? 'bg-green-100 text-green-800' :
+                      etape.statut === 'en-cours' ? 'bg-blue-100 text-blue-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                      {etape.statut === 'terminee' ? 'Terminée' :
+                        etape.statut === 'en-cours' ? 'En cours' : 'Planifiée'}
+                    </span>
+                  </div>
+
+                  <p className="text-gray-600 mb-3">{etape.description}</p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500">Début :</span>
+                      <p className="font-medium text-gray-800">
+                        {etape.dateDebut.toLocaleDateString('fr-FR')}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Fin prévue :</span>
+                      <p className="font-medium text-gray-800">
+                        {etape.dateFin.toLocaleDateString('fr-FR')}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Entreprise :</span>
+                      <p className="font-medium text-gray-800">{etape.entreprise}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
-
-              {/* Contenu */}
-              <div className="flex-1 pb-6">
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="font-semibold text-gray-800">{etape.nom}</h3>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${etape.statut === 'terminee' ? 'bg-green-100 text-green-800' :
-                    etape.statut === 'en-cours' ? 'bg-blue-100 text-blue-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                    {etape.statut === 'terminee' ? 'Terminée' :
-                      etape.statut === 'en-cours' ? 'En cours' : 'Planifiée'}
-                  </span>
-                </div>
-
-                <p className="text-gray-600 mb-3">{etape.description}</p>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-500">Début :</span>
-                    <p className="font-medium text-gray-800">
-                      {etape.dateDebut.toLocaleDateString('fr-FR')}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Fin prévue :</span>
-                    <p className="font-medium text-gray-800">
-                      {etape.dateFin.toLocaleDateString('fr-FR')}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Entreprise :</span>
-                    <p className="font-medium text-gray-800">{etape.entreprise}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Informations pratiques */}
       <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6">

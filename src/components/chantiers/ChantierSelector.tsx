@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Calendar, MapPin, Users, ArrowRight, Edit2, LogOut, Trash2 } from 'lucide-react';
-import { AppIcon, Icon } from '../Icon';
-import { chantierService } from '../../firebase/chantiers';
+import { Plus, Calendar, MapPin, Users, ArrowRight, Edit2, LogOut, Trash2, FileText } from 'lucide-react';
+import { AppIcon } from '../Icon';
 import type { Chantier } from '../../firebase/chantiers';
 import { useChantier } from '../../contexts/ChantierContext';
 import { Modal } from '../Modal';
@@ -25,52 +24,43 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
   const [successMessage, setSuccessMessage] = useState('');
   const { setChantierActuel, setChangtierId } = useChantier();
 
-  // Fonction pour obtenir le chantier principal (avec infos sauvegardées)
-  const getChantierPrincipal = (): Chantier => {
-    const savedInfo = localStorage.getItem('chantier-principal-info');
+  // Fonction pour obtenir le chantier Grohens-Pitet depuis Firebase V2
+  const getChantierPrincipal = async (): Promise<Chantier> => {
+    try {
+      // Essayer de charger depuis Firebase V2
+      const { getDocs, collection } = await import('firebase/firestore');
+      const { db } = await import('../../firebase/config');
 
-    if (savedInfo) {
-      const parsed = JSON.parse(savedInfo);
-      return {
-        ...parsed,
-        dateDebut: new Date(parsed.dateDebut),
-        dateFinPrevue: new Date(parsed.dateFinPrevue),
-        dateCreation: new Date(parsed.dateCreation),
-        dateModification: new Date(parsed.dateModification)
-      };
+      const infoSnapshot = await getDocs(collection(db, 'chantiers/chantier-grohens-pitet/info'));
+
+      if (infoSnapshot.docs.length > 0) {
+        const data = infoSnapshot.docs[0].data();
+        console.log('✅ Chantier Grohens-Pitet chargé depuis Firebase V2');
+
+        return {
+          id: 'chantier-grohens-pitet',
+          nom: data.nom || '🏠 Rénovation ancien chemin du halage',
+          description: data.description || 'Rénovation complète',
+          clientNom: data.clientNom || 'Grohens Pitet',
+          clientEmail: data.clientEmail || 'coralie.grohens@gmail.com',
+          clientTelephone: data.clientTelephone || '',
+          adresse: data.adresse || '27 ancien chemin du halage 31170 Tournefeuille',
+          dateDebut: data.dateDebut?.toDate() || new Date('2025-01-10'),
+          dateFinPrevue: data.dateFinPrevue?.toDate() || new Date('2025-01-02'),
+          budget: data.budget || 35000,
+          statut: data.statut || 'en-cours',
+          professionalId: data.professionalId || professionalId,
+          dateCreation: data.dateCreation?.toDate() || new Date('2024-01-01'),
+          dateModification: data.dateModification?.toDate() || new Date()
+        };
+      }
+    } catch (error) {
+      console.warn('⚠️ Impossible de charger depuis Firebase V2, utilisation des données par défaut');
     }
 
-    // VALEURS CORRECTES par défaut (vos vraies données)
+    // Fallback si Firebase V2 pas disponible
     return {
-      id: 'chantier-principal',
-      nom: '🏠 Rénovation ancien chemin du halage',
-      description: 'Rénovation complète d\'une maison d\'habitation',
-      clientNom: 'Grohens Pitet',
-      clientEmail: 'coralie.grohens@gmail.com',
-      clientTelephone: '',
-      adresse: '27 ancien chemin du halage 31170 Tournefeuille',
-      dateDebut: new Date('2025-01-10'),
-      dateFinPrevue: new Date('2025-01-02'),
-      budget: 35000,
-      statut: 'en-cours',
-      professionalId: 'professional-1',
-      dateCreation: new Date('2024-01-01'),
-      dateModification: new Date()
-    };
-  };
-
-  useEffect(() => {
-    // FORCER la restauration du chantier principal au démarrage
-    forceRestoreChantierPrincipal();
-    loadChantiers();
-  }, [professionalId]);
-
-  const forceRestoreChantierPrincipal = () => {
-    console.log('🚨 FORCE RESTAURATION du chantier principal');
-
-    // Restaurer les vraies données du chantier principal
-    const vraiChantierPrincipal: Chantier = {
-      id: 'chantier-principal',
+      id: 'chantier-grohens-pitet',
       nom: '🏠 Rénovation ancien chemin du halage',
       description: 'Rénovation complète d\'une maison d\'habitation',
       clientNom: 'Grohens Pitet',
@@ -85,18 +75,26 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
       dateCreation: new Date('2024-01-01'),
       dateModification: new Date()
     };
+  };
 
-    // Sauvegarder de force
-    localStorage.setItem('chantier-principal-info', JSON.stringify(vraiChantierPrincipal));
-    console.log('✅ Chantier principal restauré de force');
+  useEffect(() => {
+    // FORCER la restauration du chantier principal au démarrage
+    forceRestoreChantierPrincipal();
+    loadChantiers();
+  }, [professionalId]);
+
+  const forceRestoreChantierPrincipal = async () => {
+    console.log('🚨 FORCE RESTAURATION du chantier principal');
+    // Plus besoin de forcer, on charge depuis Firebase V2
+    console.log('✅ Chargement depuis Firebase V2');
   };
 
   const loadChantiers = async () => {
     try {
       setLoading(true);
 
-      // Obtenir le chantier principal (avec modifications sauvegardées)
-      const chantierPrincipalActuel = getChantierPrincipal();
+      // Obtenir le chantier principal depuis Firebase V2
+      const chantierPrincipalActuel = await getChantierPrincipal();
 
       // Charger les autres chantiers sauvegardés
       const savedChantiers = localStorage.getItem('chantiers');
@@ -112,12 +110,12 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
         dateModification: new Date(chantier.dateModification)
       }));
 
-      // Combiner chantier principal + autres chantiers (éviter doublons)
-      const chantiersUniques = chantiersWithDates.filter(c => c.id !== 'chantier-principal');
+      // Combiner chantier Grohens-Pitet + autres chantiers (éviter doublons)
+      const chantiersUniques = chantiersWithDates.filter((c: Chantier) => c.id !== 'chantier-grohens-pitet');
 
       // Supprimer les doublons par nom ET par ID
-      const chantiersFiltrés = chantiersUniques.filter((chantier, index, array) =>
-        array.findIndex(c => c.nom === chantier.nom || c.id === chantier.id) === index
+      const chantiersFiltrés = chantiersUniques.filter((chantier: Chantier, index: number, array: Chantier[]) =>
+        array.findIndex((c: Chantier) => c.nom === chantier.nom || c.id === chantier.id) === index
       );
 
       const tousLesChantiers = [chantierPrincipalActuel, ...chantiersFiltrés];
@@ -126,7 +124,8 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
       console.log('🔧 CHARGEMENT: Chantiers chargés:', tousLesChantiers.map(c => ({ nom: c.nom, id: c.id })));
     } catch (error) {
       console.error('Erreur chargement chantiers:', error);
-      setChantiers([getChantierPrincipal()]);
+      const fallbackChantier = await getChantierPrincipal();
+      setChantiers([fallbackChantier]);
     } finally {
       setLoading(false);
     }
@@ -157,80 +156,39 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
         dateModification: new Date()
       };
 
-      // 2. Créer automatiquement le compte client
+      // 2. Préparer les informations client (SANS créer le compte pour éviter la déconnexion)
       if (chantierData.clientEmail && chantierData.clientEmail.trim()) {
-        try {
-          const { authService } = await import('../../firebase/auth');
-          const { createUserWithEmailAndPassword, updateProfile, signOut } = await import('firebase/auth');
-          const { auth } = await import('../../firebase/config');
+        console.log('📋 Préparation des informations client pour:', chantierData.clientEmail);
 
-          console.log('🔧 Création automatique du compte client pour:', chantierData.clientEmail);
+        // Sauvegarder les informations du client en attente
+        const clientInfo = {
+          chantierId: chantierId,
+          clientEmail: chantierData.clientEmail,
+          clientNom: chantierData.clientNom,
+          chantierNom: chantierData.nom,
+          dateCreation: new Date().toISOString()
+        };
 
-          // Générer un mot de passe temporaire aléatoire
-          const tempPassword = 'temp' + Math.random().toString(36).substring(2, 12) + '!';
+        // Sauvegarder dans localStorage pour référence
+        const existingClients = JSON.parse(localStorage.getItem('clients-en-attente') || '[]');
+        existingClients.push(clientInfo);
+        localStorage.setItem('clients-en-attente', JSON.stringify(existingClients));
 
-          try {
-            // Créer le compte client
-            const clientCredential = await createUserWithEmailAndPassword(auth, chantierData.clientEmail, tempPassword);
-            await updateProfile(clientCredential.user, { displayName: chantierData.clientNom });
+        console.log('✅ Informations client préparées (pas de déconnexion)');
 
-            // Créer le profil client avec le bon rôle et chantier
-            await authService.createUserProfile(clientCredential.user.uid, {
-              email: chantierData.clientEmail,
-              displayName: chantierData.clientNom,
-              role: 'client',
-              chantierId: chantierId
-            });
-
-            // Se déconnecter du compte client (pour revenir au professionnel)
-            await signOut(auth);
-
-            console.log('✅ Compte client créé automatiquement');
-
-            // Message avec instructions pour le professionnel
-            setSuccessMessage(
-              `Chantier "${chantierData.nom}" et compte client créés !\n\n` +
-              `👤 Client: ${chantierData.clientNom} (${chantierData.clientEmail})\n\n` +
-              `📧 Instructions à transmettre au client :\n\n` +
-              `1. Aller sur votre application de suivi de chantier\n` +
-              `2. Cliquer sur "Mot de passe oublié ?"\n` +
-              `3. Saisir son email: ${chantierData.clientEmail}\n` +
-              `4. Vérifier ses emails et définir un nouveau mot de passe\n` +
-              `5. Se connecter avec son email et nouveau mot de passe\n\n` +
-              `✅ Il aura automatiquement accès à son chantier !`
-            );
-            setShowSuccessModal(true);
-
-          } catch (createError: any) {
-            if (createError.code === 'auth/email-already-in-use') {
-              console.log('ℹ️ Compte client existe déjà - tentative de mise à jour du chantier');
-
-              // TODO: Mettre à jour le chantierId du compte existant
-              // Pour l'instant, on informe que le compte existe mais ne sera pas associé automatiquement
-
-              setSuccessMessage(
-                `Chantier "${chantierData.nom}" créé !\n\n` +
-                `⚠️ Un compte existe déjà pour ${chantierData.clientEmail}\n\n` +
-                `IMPORTANT: Ce compte était associé à un autre chantier.\n` +
-                `Vous devez manuellement associer ce client au nouveau chantier.\n\n` +
-                `📧 Instructions pour le client :\n` +
-                `1. Se connecter avec son email et mot de passe existant\n` +
-                `2. Ou utiliser "Mot de passe oublié ?" s'il a oublié\n\n` +
-                `⚠️ ATTENTION: Il verra peut-être l'ancien chantier - contactez-moi pour corriger.`
-              );
-              setShowSuccessModal(true);
-            } else {
-              throw createError;
-            }
-          }
-
-        } catch (error: any) {
-          console.error('Erreur création compte client:', error);
-          setSuccessMessage(
-            `Chantier créé !\n\n⚠️ Erreur création compte client :\n${error.message}\n\nVous devrez créer le compte manuellement.`
-          );
-          setShowSuccessModal(true);
-        }
+        // Message avec instructions pour le professionnel
+        setSuccessMessage(
+          `Chantier "${chantierData.nom}" créé avec succès !\n\n` +
+          `👤 Client: ${chantierData.clientNom} (${chantierData.clientEmail})\n\n` +
+          `📧 Instructions à transmettre au client :\n\n` +
+          `1. Aller sur votre application de suivi de chantier\n` +
+          `2. Cliquer sur "S'inscrire"\n` +
+          `3. Utiliser son email: ${chantierData.clientEmail}\n` +
+          `4. Choisir un mot de passe\n` +
+          `5. Il sera automatiquement associé à ce chantier\n\n` +
+          `✅ Vous restez connecté et pouvez continuer à travailler !`
+        );
+        setShowSuccessModal(true);
       }
 
       // 3. Ajouter à la liste sans toucher au localStorage pour l'instant
@@ -396,6 +354,8 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
     if (!selectedChantier) return;
 
     try {
+      console.log(`🔄 Modification chantier ${selectedChantier.id}`);
+
       const updatedChantier: Chantier = {
         ...chantierData,
         id: selectedChantier.id,
@@ -404,55 +364,155 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
         dateModification: new Date()
       };
 
-      // Mettre à jour dans la liste
+      // Sauvegarder dans Firebase V2
+      if (selectedChantier.id === 'chantier-grohens-pitet') {
+        // Sauvegarder dans Firebase V2
+        const { doc, updateDoc, Timestamp } = await import('firebase/firestore');
+        const { db } = await import('../../firebase/config');
+
+        const chantierInfoRef = doc(db, `chantiers/${selectedChantier.id}/info`, 'details');
+        await updateDoc(chantierInfoRef, {
+          nom: chantierData.nom,
+          description: chantierData.description,
+          clientNom: chantierData.clientNom,
+          clientEmail: chantierData.clientEmail,
+          clientTelephone: chantierData.clientTelephone,
+          adresse: chantierData.adresse,
+          dateDebut: Timestamp.fromDate(chantierData.dateDebut),
+          dateFinPrevue: Timestamp.fromDate(chantierData.dateFinPrevue),
+          budget: chantierData.budget,
+          statut: chantierData.statut,
+          notes: chantierData.notes,
+          dateModification: Timestamp.fromDate(new Date())
+        });
+
+        console.log('✅ Chantier modifié dans Firebase V2');
+      } else {
+        // Autres chantiers : localStorage pour l'instant
+        const updatedChantiers = chantiers.map(c =>
+          c.id === selectedChantier.id ? updatedChantier : c
+        );
+        saveChantiers(updatedChantiers);
+      }
+
+      // Mettre à jour l'affichage
       const updatedChantiers = chantiers.map(c =>
         c.id === selectedChantier.id ? updatedChantier : c
       );
       setChantiers(updatedChantiers);
 
-      // Sauvegarder (même le chantier principal peut être modifié)
-      if (selectedChantier.id === 'chantier-principal') {
-        // Sauvegarder les infos du chantier principal séparément
-        localStorage.setItem('chantier-principal-info', JSON.stringify(updatedChantier));
-      } else {
-        saveChantiers(updatedChantiers);
-      }
-
       setShowEditChantierModal(false);
       setSelectedChantier(null);
+
+      setSuccessMessage(`Chantier "${chantierData.nom}" modifié avec succès !`);
+      setShowSuccessModal(true);
+
     } catch (error) {
       console.error('Erreur modification chantier:', error);
-      alert('Erreur lors de la modification du chantier');
-    }
-  };
-
-  const handleFixUserName = async () => {
-    const newName = prompt(
-      'Corriger votre nom d\'affichage :\n\n' +
-      'Saisissez votre vrai nom :'
-    );
-
-    if (!newName || newName.trim() === '') return;
-
-    try {
-      const { authService } = await import('../../firebase/auth');
-      const { auth } = await import('../../firebase/config');
-
-      if (auth.currentUser) {
-        await authService.updateUserProfile(auth.currentUser.uid, {
-          displayName: newName.trim()
-        });
-
-        setSuccessMessage(`Nom mis à jour vers "${newName.trim()}" !\n\nReconnectez-vous pour voir le changement.`);
-        setShowSuccessModal(true);
-      }
-    } catch (error) {
-      console.error('Erreur mise à jour nom:', error);
-      setSuccessMessage('❌ Erreur lors de la mise à jour du nom.');
+      setSuccessMessage('❌ Erreur lors de la modification du chantier');
       setShowSuccessModal(true);
     }
   };
 
+
+  const handleExportData = async () => {
+    try {
+      setSuccessMessage('🔄 Export en cours...\n\nVeuillez patienter pendant la sauvegarde de toutes vos données.');
+      setShowSuccessModal(true);
+
+      const { exportChantierPrincipalData, afficherResumeChantier } = await import('../../utils/exportData');
+
+      console.log('🔄 Début de l\'export des données...');
+      const exportedData = await exportChantierPrincipalData();
+
+      afficherResumeChantier(exportedData);
+
+      setSuccessMessage(
+        `✅ Sauvegarde terminée !\n\n` +
+        `📁 Fichier téléchargé : chantier-principal-backup-${new Date().toISOString().split('T')[0]}.json\n\n` +
+        `📊 Données sauvegardées :\n` +
+        `• ${exportedData.stats.entreprises} entreprises\n` +
+        `• ${exportedData.stats.devis} devis\n` +
+        `• ${exportedData.stats.commandes} commandes\n` +
+        `• ${exportedData.stats.paiements} paiements\n` +
+        `• ${exportedData.stats.documents} documents\n` +
+        `• ${exportedData.stats.rendezVous} rendez-vous\n\n` +
+        `🛡️ Vos données sont maintenant sécurisées !`
+      );
+
+    } catch (error: any) {
+      console.error('❌ Erreur export:', error);
+      setSuccessMessage(`❌ Erreur lors de l'export :\n${error.message}\n\nVérifiez la console pour plus de détails.`);
+    }
+  };
+
+  const handleMigration = async () => {
+    try {
+      // Demander confirmation
+      const confirmation = window.confirm(
+        '🚨 MIGRATION VERS STRUCTURE V2\n\n' +
+        'Cette opération va :\n' +
+        '1. Migrer toutes vos données vers une nouvelle structure Firebase\n' +
+        '2. Corriger définitivement les problèmes d\'isolation\n' +
+        '3. Permettre une gestion propre par chantier\n\n' +
+        '⚠️ IMPORTANT : Assurez-vous d\'avoir sauvegardé vos données avant !\n\n' +
+        'Continuer la migration ?'
+      );
+
+      if (!confirmation) return;
+
+      setSuccessMessage('🔄 Migration V2 en cours...\n\nMigration de vos données vers la nouvelle structure.\nCela peut prendre quelques minutes.');
+      setShowSuccessModal(true);
+
+      // Import du service de migration
+      const { MigrationV2 } = await import('../../utils/migration');
+
+      // Demander à l'utilisateur de fournir le fichier de sauvegarde
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = '.json';
+
+      const backupData = await new Promise((resolve, reject) => {
+        fileInput.onchange = async (e: any) => {
+          try {
+            const file = e.target.files[0];
+            if (!file) {
+              reject(new Error('Aucun fichier sélectionné'));
+              return;
+            }
+
+            const text = await file.text();
+            const data = JSON.parse(text);
+            console.log('📁 Fichier de sauvegarde chargé:', data.stats);
+            resolve(data);
+          } catch (error) {
+            reject(error);
+          }
+        };
+
+        fileInput.click();
+      });
+
+      // Lancer la migration
+      await MigrationV2.migrerChantierPrincipal(backupData);
+
+      setSuccessMessage(
+        `🎉 MIGRATION V2 TERMINÉE !\n\n` +
+        `✅ Structure Firebase modernisée\n` +
+        `✅ Données isolées par chantier\n` +
+        `✅ Problèmes de mélange résolus\n\n` +
+        `📋 Prochaines étapes :\n` +
+        `1. Vérifier que vos données sont bien migrées\n` +
+        `2. Tester les fonctionnalités\n` +
+        `3. Nettoyer les anciennes collections\n\n` +
+        `🚀 Votre application est maintenant optimisée !`
+      );
+
+    } catch (error: any) {
+      console.error('❌ Erreur migration:', error);
+      setSuccessMessage(`❌ Erreur lors de la migration :\n${error.message}\n\nVos données originales sont préservées.`);
+    }
+  };
 
   const getStatutColor = (statut: string) => {
     switch (statut) {
@@ -518,16 +578,7 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
             <AppIcon size={48} className="brightness-100" />
           </div>
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            Bonjour {professionalName} !
-            {professionalName === 'Utilisateur' && (
-              <button
-                onClick={handleFixUserName}
-                className="ml-2 text-sm text-blue-600 hover:text-blue-800 underline"
-                title="Corriger le nom d'affichage"
-              >
-                (corriger le nom)
-              </button>
-            )}
+            Bonjour {professionalName === 'Utilisateur' ? 'Administrateur' : professionalName} !
           </h1>
           <p className="text-gray-600">
             Sélectionnez le chantier sur lequel vous souhaitez travailler
@@ -535,13 +586,29 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
         </div>
 
         {/* Actions */}
-        <div className="flex justify-center mb-8">
+        <div className="flex justify-center mb-8 space-x-4">
           <button
             onClick={() => setShowNewChantierModal(true)}
             className="btn-primary flex items-center space-x-2"
           >
             <Plus className="w-5 h-5" />
             <span>Nouveau chantier</span>
+          </button>
+
+          <button
+            onClick={handleExportData}
+            className="btn-secondary flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white"
+          >
+            <FileText className="w-5 h-5" />
+            <span>Sauvegarder mes données</span>
+          </button>
+
+          <button
+            onClick={handleMigration}
+            className="btn-secondary flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white"
+          >
+            <ArrowRight className="w-5 h-5" />
+            <span>Migration V2</span>
           </button>
         </div>
 
@@ -769,7 +836,7 @@ function NewChantierForm({
     dateDebut: '',
     dateFinPrevue: '',
     budget: '',
-    statut: 'planifie' as const,
+    statut: 'planifie' as 'planifie' | 'en-cours' | 'termine' | 'suspendu',
     notes: ''
   });
 
