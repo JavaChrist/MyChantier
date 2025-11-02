@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Search, Users, Calendar, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, Users, Calendar, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import { Icon } from '../Icon';
-import { entreprisesService, devisService, commandesService } from '../../firebase/entreprises';
-import type { Entreprise, Devis, Commande } from '../../firebase/entreprises';
+import type { Entreprise, Devis, Commande } from '../../firebase/unified-services';
 import { useChantier } from '../../contexts/ChantierContext';
 import { useChantierData } from '../../hooks/useChantierData';
 import { Modal } from '../Modal';
@@ -449,6 +448,7 @@ export function PrestationsManager() {
           <DevisManager
             entrepriseId={selectedEntrepriseForDevis.id}
             entrepriseName={selectedEntrepriseForDevis.nom}
+            chantierId={chantierId || 'chantier-principal'}
           />
         </Modal>
       )}

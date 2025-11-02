@@ -84,18 +84,23 @@ export const authService = {
   // Créer le profil utilisateur dans Firestore
   async createUserProfile(uid: string, userData: { email: string; displayName: string; role: 'professional' | 'client'; chantierId?: string }): Promise<void> {
     try {
-      const userProfile = {
+      // Ne pas inclure chantierId s'il est undefined (Firebase n'accepte pas undefined)
+      const userProfile: any = {
         uid,
         email: userData.email,
         displayName: userData.displayName,
         role: userData.role,
-        chantierId: userData.chantierId,
         dateCreation: new Date(),
         derniereConnexion: new Date()
       };
 
+      // Ajouter chantierId seulement s'il existe
+      if (userData.chantierId) {
+        userProfile.chantierId = userData.chantierId;
+      }
+
       await setDoc(doc(db, 'users', uid), userProfile);
-      console.log('✅ Profil utilisateur créé');
+      console.log('✅ Profil utilisateur créé:', { email: userData.email, role: userData.role, chantierId: userData.chantierId });
     } catch (error) {
       console.error('Erreur création profil:', error);
       throw error;
@@ -147,12 +152,41 @@ export const authService = {
           derniereConnexion = new Date();
         }
 
+        // Déterminer le rôle intelligemment si non défini
+        let userRole = data.role;
+        const user = auth.currentUser;
+        
+        if (!userRole) {
+          userRole = (user?.email === 'contact@javachrist.fr') ? 'professional' : 'client';
+          console.log('⚠️ Rôle non défini, détection automatique:', userRole);
+          
+          // Sauvegarder le rôle corrigé dans Firestore
+          await setDoc(doc(db, 'users', uid), { role: userRole }, { merge: true });
+        }
+
+        // Pour les clients, le chantierId doit être assigné par le professionnel
+        let chantierId = data.chantierId;
+        if (userRole === 'client' && !chantierId) {
+          console.warn('⚠️ Client sans chantierId assigné - doit être configuré par le professionnel');
+          // Ne pas assigner automatiquement un chantier par défaut
+          // Le client verra un message lui demandant de contacter le professionnel
+        }
+
+        // Utiliser l'email de Firebase Auth si celui de Firestore est vide
+        const userEmail = data.email || user?.email || '';
+        
+        // Si l'email était vide dans Firestore, le corriger
+        if (!data.email && user?.email) {
+          console.log('🔧 Correction email manquant dans Firestore:', user.email);
+          await setDoc(doc(db, 'users', uid), { email: user.email }, { merge: true });
+        }
+
         return {
           uid: data.uid || uid,
-          email: data.email || '',
+          email: userEmail,
           displayName: data.displayName || 'Utilisateur',
-          role: data.role || 'professional',
-          chantierId: data.chantierId,
+          role: userRole,
+          chantierId: chantierId,
           dateCreation,
           derniereConnexion
         } as UserProfile;
@@ -245,6 +279,55 @@ export const authService = {
     } catch (error) {
       console.error('Erreur mise à jour profil:', error);
       throw error;
+    }
+  },
+
+  // Récupérer tous les utilisateurs (pour l'admin)
+  async getAllUsers(): Promise<UserProfile[]> {
+    try {
+      const { collection, getDocs } = await import('firebase/firestore');
+      const querySnapshot = await getDocs(collection(db, 'users'));
+      
+      const users: UserProfile[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        
+        // Gestion sécurisée des dates
+        let dateCreation = new Date();
+        let derniereConnexion = new Date();
+        
+        try {
+          if (data.dateCreation?.toDate) {
+            dateCreation = data.dateCreation.toDate();
+          }
+        } catch (e) {
+          console.warn('Erreur conversion dateCreation:', e);
+        }
+        
+        try {
+          if (data.derniereConnexion?.toDate) {
+            derniereConnexion = data.derniereConnexion.toDate();
+          }
+        } catch (e) {
+          console.warn('Erreur conversion derniereConnexion:', e);
+        }
+        
+        users.push({
+          uid: data.uid || doc.id,
+          email: data.email || '',
+          displayName: data.displayName || 'Utilisateur',
+          role: data.role || 'client',
+          chantierId: data.chantierId,
+          dateCreation,
+          derniereConnexion
+        });
+      });
+      
+      console.log(`✅ ${users.length} utilisateurs chargés`);
+      return users;
+    } catch (error) {
+      console.error('Erreur récupération utilisateurs:', error);
+      return [];
     }
   },
 

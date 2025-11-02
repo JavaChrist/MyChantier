@@ -18,6 +18,7 @@ export interface Entreprise {
   nom: string;
   siret?: string;
   secteurActivite: 'sanitaire' | 'electricite' | 'carrelage' | 'menuiserie' | 'peinture';
+  chantierId: string;
   contact: {
     nom: string;
     telephone: string;
@@ -51,6 +52,8 @@ export interface Devis {
   statut: 'en-attente' | 'valide' | 'refuse';
   fichierUrl?: string;
   notes?: string;
+  dateValidation?: Date;
+  validePar?: string;
 }
 
 export interface Commande {
@@ -85,12 +88,19 @@ export interface DocumentOfficiel {
   entrepriseId: string;
   type: 'assurance-rc' | 'assurance-decennale' | 'garantie' | 'certification' | 'kbis' | 'autre';
   nom: string;
-  statut: 'valide' | 'expire' | 'bientot-expire';
+  description: string;
+  numeroPolice?: string;
+  compagnieAssurance?: string;
+  dateDebut?: Date;
+  dateFin?: Date;
+  montantGarantie?: number;
   fichierUrl: string;
   fichierNom: string;
-  typeFichier: string;
   tailleFichier: number;
+  typeFichier: string;
   dateUpload: Date;
+  statut: 'valide' | 'expire' | 'bientot-expire' | 'en-attente';
+  notes?: string;
 }
 
 export interface RendezVous {
@@ -191,12 +201,16 @@ export const unifiedDevisService = {
         orderBy('dateRemise', 'desc')
       );
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        dateRemise: doc.data().dateRemise.toDate(),
-        dateValidite: doc.data().dateValidite.toDate()
-      } as Devis));
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          dateRemise: data.dateRemise?.toDate() || new Date(),
+          dateValidite: data.dateValidite?.toDate() || new Date(),
+          dateValidation: data.dateValidation?.toDate()
+        } as Devis;
+      });
     } catch (error) {
       console.error(`❌ Erreur chargement devis ${chantierId}:`, error);
       return [];
@@ -211,6 +225,26 @@ export const unifiedDevisService = {
       dateValidite: Timestamp.fromDate(devis.dateValidite)
     });
     return docRef.id;
+  },
+
+  // Mettre à jour un devis
+  async update(chantierId: string, devisId: string, updates: Partial<Devis>): Promise<void> {
+    const docRef = doc(db, `chantiers/${chantierId}/devis`, devisId);
+    const updateData: any = { ...updates };
+
+    // Convertir les dates en Timestamp si présentes
+    if (updateData.dateRemise) {
+      updateData.dateRemise = Timestamp.fromDate(updateData.dateRemise);
+    }
+    if (updateData.dateValidite) {
+      updateData.dateValidite = Timestamp.fromDate(updateData.dateValidite);
+    }
+    if (updateData.dateValidation) {
+      updateData.dateValidation = Timestamp.fromDate(updateData.dateValidation);
+    }
+
+    await updateDoc(docRef, updateData);
+    console.log(`✅ Devis ${devisId} mis à jour dans ${chantierId}`);
   }
 };
 
@@ -289,11 +323,16 @@ export const unifiedDocumentsService = {
         orderBy('dateUpload', 'desc')
       );
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        dateUpload: doc.data().dateUpload.toDate()
-      } as DocumentOfficiel));
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          dateUpload: data.dateUpload?.toDate() || new Date(),
+          dateDebut: data.dateDebut?.toDate(),
+          dateFin: data.dateFin?.toDate()
+        } as DocumentOfficiel;
+      });
     } catch (error) {
       console.error(`❌ Erreur chargement documents ${chantierId}:`, error);
       return [];
@@ -302,11 +341,48 @@ export const unifiedDocumentsService = {
 
   // Créer un document
   async create(chantierId: string, document: Omit<DocumentOfficiel, 'id'>): Promise<string> {
-    const docRef = await addDoc(collection(db, `chantiers/${chantierId}/documents`), {
+    const docData: any = {
       ...document,
       dateUpload: Timestamp.fromDate(document.dateUpload)
-    });
+    };
+
+    // Convertir les dates optionnelles
+    if (document.dateDebut) {
+      docData.dateDebut = Timestamp.fromDate(document.dateDebut);
+    }
+    if (document.dateFin) {
+      docData.dateFin = Timestamp.fromDate(document.dateFin);
+    }
+
+    const docRef = await addDoc(collection(db, `chantiers/${chantierId}/documents`), docData);
+    console.log(`✅ Document créé avec ID: ${docRef.id} dans chantiers/${chantierId}/documents`);
     return docRef.id;
+  },
+
+  // Mettre à jour un document
+  async update(chantierId: string, documentId: string, updates: Partial<DocumentOfficiel>): Promise<void> {
+    const docRef = doc(db, `chantiers/${chantierId}/documents`, documentId);
+    const updateData: any = { ...updates };
+
+    // Convertir les dates en Timestamp si présentes
+    if (updateData.dateUpload) {
+      updateData.dateUpload = Timestamp.fromDate(updateData.dateUpload);
+    }
+    if (updateData.dateDebut) {
+      updateData.dateDebut = Timestamp.fromDate(updateData.dateDebut);
+    }
+    if (updateData.dateFin) {
+      updateData.dateFin = Timestamp.fromDate(updateData.dateFin);
+    }
+
+    await updateDoc(docRef, updateData);
+    console.log(`✅ Document ${documentId} mis à jour dans ${chantierId}`);
+  },
+
+  // Supprimer un document
+  async delete(chantierId: string, documentId: string): Promise<void> {
+    await deleteDoc(doc(db, `chantiers/${chantierId}/documents`, documentId));
+    console.log(`✅ Document ${documentId} supprimé de ${chantierId}`);
   }
 };
 

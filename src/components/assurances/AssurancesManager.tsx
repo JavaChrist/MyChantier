@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Shield, FileText, Calendar, AlertTriangle, CheckCircle, Clock, Upload, Download, Eye, Edit2, Trash2, Building2 } from 'lucide-react';
-import { entreprisesService } from '../../firebase/entreprises';
+import { Plus, Shield, FileText, AlertTriangle, CheckCircle, Clock, Upload, Download, Eye, Edit2, Trash2 } from 'lucide-react';
 import { documentsService, uploadDocumentFile } from '../../firebase/documents';
+import { unifiedDocumentsService, type DocumentOfficiel } from '../../firebase/unified-services';
 import { useChantier } from '../../contexts/ChantierContext';
 import { useChantierData } from '../../hooks/useChantierData';
-import type { Entreprise } from '../../firebase/entreprises';
-import type { DocumentOfficiel } from '../../firebase/documents';
 import { Modal } from '../Modal';
 import { ConfirmModal } from '../ConfirmModal';
 
@@ -94,15 +92,20 @@ export function AssurancesManager() {
     setShowDocumentModal(true);
   };
 
-  const handleSaveDocument = async (documentData: Omit<DocumentOfficiel, 'id' | 'entrepriseId'>, file: File) => {
+  const handleSaveDocument = async (documentData: Omit<DocumentOfficiel, 'id'>, file: File) => {
     try {
+      if (!chantierId) {
+        alert('Aucun chantier sélectionné');
+        return;
+      }
+
       const documentId = crypto.randomUUID();
 
       // Upload du fichier
-      const fileInfo = await uploadDocumentFile(documentData.entrepriseId || '', documentId, file);
+      const fileInfo = await uploadDocumentFile(documentData.entrepriseId, documentId, file);
 
       // Créer le document avec les infos du fichier
-      const finalDocumentData = {
+      const finalDocumentData: Omit<DocumentOfficiel, 'id'> = {
         ...documentData,
         fichierUrl: fileInfo.url,
         fichierNom: fileInfo.nom,
@@ -112,16 +115,21 @@ export function AssurancesManager() {
       };
 
       if (selectedDocument?.id) {
-        await documentsService.update(selectedDocument.entrepriseId, selectedDocument.id, finalDocumentData);
+        // Mise à jour - utiliser le système unifié V2
+        console.log(`🔄 Mise à jour document dans chantier ${chantierId}`);
+        await unifiedDocumentsService.update(chantierId, selectedDocument.id, finalDocumentData);
       } else {
-        await documentsService.create(documentData.entrepriseId || '', finalDocumentData);
+        // Création - utiliser le système unifié V2
+        console.log(`🏗️ Création document dans chantier ${chantierId}`);
+        await unifiedDocumentsService.create(chantierId, finalDocumentData);
+        console.log(`✅ Document créé dans Firebase V2`);
       }
 
       await reloadData();
       setShowDocumentModal(false);
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
-      alert(`Erreur lors de la sauvegarde: ${error.message}`);
+      alert(`Erreur lors de la sauvegarde: ${(error as any).message}`);
     }
   };
 
@@ -131,14 +139,16 @@ export function AssurancesManager() {
   };
 
   const confirmDelete = async () => {
-    if (documentToDelete) {
+    if (documentToDelete && chantierId) {
       try {
-        await documentsService.delete(documentToDelete.entrepriseId, documentToDelete.documentId);
+        console.log(`🗑️ Suppression document ${documentToDelete.documentId} du chantier ${chantierId}`);
+        await unifiedDocumentsService.delete(chantierId, documentToDelete.documentId);
         await reloadData();
         setShowConfirmModal(false);
         setDocumentToDelete(null);
       } catch (error) {
         console.error('Erreur lors de la suppression:', error);
+        alert('Erreur lors de la suppression du document');
       }
     }
   };
@@ -185,12 +195,13 @@ export function AssurancesManager() {
     return typeObj?.label || type;
   };
 
-  const getJoursRestants = (dateFin: Date | undefined) => {
-    if (!dateFin) return null;
-    const maintenant = new Date();
-    const jours = Math.ceil((dateFin.getTime() - maintenant.getTime()) / (1000 * 60 * 60 * 24));
-    return jours;
-  };
+  // Fonction utilitaire (potentiellement utilisée plus tard)
+  // const getJoursRestants = (dateFin: Date | undefined) => {
+  //   if (!dateFin) return null;
+  //   const maintenant = new Date();
+  //   const jours = Math.ceil((dateFin.getTime() - maintenant.getTime()) / (1000 * 60 * 60 * 24));
+  //   return jours;
+  // };
 
   // Statistiques
   const stats = {
@@ -368,8 +379,6 @@ export function AssurancesManager() {
         ) : (
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {filteredDocuments.map((document) => {
-              const joursRestants = getJoursRestants(document.dateFin);
-
               return (
                 <div
                   key={document.id}
@@ -491,14 +500,15 @@ function DocumentForm({
   onCancel
 }: {
   document: DocumentOfficiel | null;
-  entreprises: Entreprise[];
-  onSave: (document: Omit<DocumentOfficiel, 'id' | 'entrepriseId'>, file: File) => void;
+  entreprises: any[];
+  onSave: (document: Omit<DocumentOfficiel, 'id'>, file: File) => void;
   onCancel: () => void;
 }) {
   const [formData, setFormData] = useState({
     entrepriseId: '',
-    type: 'assurance-rc' as const,
-    nom: ''
+    type: 'assurance-rc' as 'assurance-rc' | 'assurance-decennale' | 'garantie' | 'certification' | 'kbis' | 'autre',
+    nom: '',
+    description: ''
   });
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -509,7 +519,8 @@ function DocumentForm({
       setFormData({
         entrepriseId: document.entrepriseId,
         type: document.type,
-        nom: document.nom
+        nom: document.nom,
+        description: document.description || ''
       });
     }
   }, [document]);
@@ -525,19 +536,18 @@ function DocumentForm({
     setUploading(true);
 
     try {
-      const documentData: Omit<DocumentOfficiel, 'id' | 'entrepriseId'> = {
+      const documentData: Omit<DocumentOfficiel, 'id'> = {
+        entrepriseId: formData.entrepriseId,
         type: formData.type,
         nom: formData.nom,
-        statut: 'valide',
+        description: formData.description || 'Document administratif',
+        statut: 'valide' as const,
         fichierUrl: document?.fichierUrl || '',
         fichierNom: document?.fichierNom || '',
         tailleFichier: document?.tailleFichier || 0,
         typeFichier: document?.typeFichier || '',
         dateUpload: document?.dateUpload || new Date()
       };
-
-      // Ajouter l'entrepriseId pour l'upload
-      (documentData as any).entrepriseId = formData.entrepriseId;
 
       await onSave(documentData, selectedFile!);
     } finally {
@@ -617,10 +627,24 @@ function DocumentForm({
         </label>
         <input
           type="text"
+          required
           value={formData.nom}
           onChange={(e) => setFormData(prev => ({ ...prev, nom: e.target.value }))}
           className="input-field w-full"
           placeholder="Ex: Assurance RC 2024"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Description (optionnelle)
+        </label>
+        <textarea
+          value={formData.description}
+          onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+          className="input-field w-full resize-none"
+          rows={3}
+          placeholder="Ex: Assurance responsabilité civile professionnelle valable jusqu'en décembre 2025"
         />
       </div>
 

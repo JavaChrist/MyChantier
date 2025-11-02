@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, FileText, Calendar, Euro, Check, X, AlertCircle, Upload, Download, Eye } from 'lucide-react';
-import { devisService } from '../../firebase/entreprises';
+import { FileText, Check, X, AlertCircle, Upload, Download, Eye } from 'lucide-react';
+import { unifiedDevisService } from '../../firebase/unified-services';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../firebase/config';
-import type { Devis } from '../../firebase/entreprises';
+import type { Devis } from '../../firebase/unified-services';
 
 // Fonction d'upload réelle avec Firebase Storage
 const uploadDevisFile = async (entrepriseId: string, devisId: string, file: File): Promise<string> => {
@@ -30,7 +30,6 @@ const uploadDevisFile = async (entrepriseId: string, devisId: string, file: File
 
     // Créer un nom de fichier unique
     const timestamp = Date.now();
-    const extension = file.name.split('.').pop();
     const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
     const fileName = `${timestamp}_${cleanName}`;
 
@@ -59,9 +58,10 @@ const uploadDevisFile = async (entrepriseId: string, devisId: string, file: File
 interface DevisManagerProps {
   entrepriseId: string;
   entrepriseName: string;
+  chantierId: string;
 }
 
-export function DevisManager({ entrepriseId, entrepriseName }: DevisManagerProps) {
+export function DevisManager({ entrepriseId, entrepriseName, chantierId }: DevisManagerProps) {
   const [devis, setDevis] = useState<Devis[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -74,7 +74,13 @@ export function DevisManager({ entrepriseId, entrepriseName }: DevisManagerProps
   const loadDevis = async () => {
     try {
       setLoading(true);
-      const data = await devisService.getByEntreprise(entrepriseId);
+      console.log(`🔍 Chargement devis pour entreprise ${entrepriseId} dans chantier ${chantierId}`);
+
+      // Charger TOUS les devis du chantier puis filtrer par entreprise
+      const allDevis = await unifiedDevisService.getByChantier(chantierId);
+      const data = allDevis.filter(d => d.entrepriseId === entrepriseId);
+
+      console.log(`✅ ${data.length} devis chargés pour cette entreprise`);
       setDevis(data);
     } catch (error) {
       console.error('Erreur lors du chargement des devis:', error);
@@ -98,11 +104,6 @@ export function DevisManager({ entrepriseId, entrepriseName }: DevisManagerProps
     }
   };
 
-  const handleCreateDevis = () => {
-    setSelectedDevis(null);
-    setShowForm(true);
-  };
-
   const handleReceiveDevis = () => {
     // Fonction pour "recevoir" un devis (upload + création)
     setSelectedDevis(null);
@@ -118,13 +119,22 @@ export function DevisManager({ entrepriseId, entrepriseName }: DevisManagerProps
     try {
       let devisId: string;
 
+      // Ajouter l'entrepriseId aux données
+      const fullDevisData = {
+        ...devisData,
+        entrepriseId: entrepriseId
+      };
+
       if (selectedDevis?.id) {
-        // Mise à jour
-        await devisService.update(entrepriseId, selectedDevis.id, devisData);
+        // Mise à jour - utiliser le système unifié V2
+        console.log(`🔄 Mise à jour devis dans chantier ${chantierId}`);
+        await unifiedDevisService.update(chantierId, selectedDevis.id, fullDevisData);
         devisId = selectedDevis.id;
       } else {
-        // Création
-        devisId = await devisService.create(entrepriseId, devisData);
+        // Création - utiliser le système unifié V2
+        console.log(`🏗️ Création devis dans chantier ${chantierId}`);
+        devisId = await unifiedDevisService.create(chantierId, fullDevisData);
+        console.log(`✅ Devis créé avec ID: ${devisId}`);
       }
 
       // Upload du fichier si fourni
@@ -134,12 +144,12 @@ export function DevisManager({ entrepriseId, entrepriseName }: DevisManagerProps
           const fileUrl = await uploadDevisFile(entrepriseId, devisId, file);
           console.log('Upload réussi, mise à jour du devis avec URL:', fileUrl);
 
-          // Mettre à jour le devis avec l'URL du fichier
-          await devisService.update(entrepriseId, devisId, { fichierUrl: fileUrl });
-          console.log('Devis mis à jour avec succès');
+          // Mettre à jour le devis avec l'URL du fichier dans le système unifié
+          await unifiedDevisService.update(chantierId, devisId, { fichierUrl: fileUrl });
+          console.log('Devis mis à jour avec succès dans Firebase V2');
         } catch (uploadError) {
           console.error('Erreur upload:', uploadError);
-          alert(`Erreur lors de l'upload du fichier: ${uploadError.message}`);
+          alert(`Erreur lors de l'upload du fichier: ${(uploadError as any).message}`);
           // Le devis est créé mais sans fichier
         }
       }
@@ -317,7 +327,7 @@ function DevisForm({
     montantTTC: '',
     dateRemise: '',
     dateValidite: '',
-    statut: 'en-attente' as const,
+    statut: 'en-attente' as 'en-attente' | 'valide' | 'refuse',
     notes: ''
   });
 

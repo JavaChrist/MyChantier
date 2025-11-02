@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { MessageCircle, Calendar, FileText, CreditCard, LogOut, User, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { useChantierData } from '../../hooks/useChantierData';
 import { ClientChat } from './ClientChat';
+import { ClientEntreprises } from './ClientEntreprises';
 import { ClientDocuments } from './ClientDocuments';
 import { ClientPlanning } from './ClientPlanning';
 import { ClientPaiements } from './ClientPaiements';
@@ -14,18 +15,26 @@ interface ClientInterfaceProps {
 
 export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInterfaceProps) {
   const [currentView, setCurrentView] = useState('overview');
-  const { entreprises, devis, commandes, paiements, loading } = useChantierData(chantierId);
+  const { entreprises, devis, commandes, paiements, loading, reloadData } = useChantierData(chantierId);
 
   // Debug pour comprendre le problème
-  console.log('🔍 DEBUG CLIENT:', {
-    userProfile: userProfile,
+  console.log('🔍 DEBUG CLIENT INTERFACE:', {
+    email: userProfile?.email,
+    role: userProfile?.role,
     chantierId: chantierId,
     userChantierId: userProfile?.chantierId,
+    loading: loading,
     entreprisesCount: entreprises.length,
     devisCount: devis.length,
     commandesCount: commandes.length,
     paiementsCount: paiements.length
   });
+
+  // Log détaillé des entreprises si aucune
+  if (entreprises.length === 0 && !loading) {
+    console.warn('⚠️ AUCUNE ENTREPRISE CHARGÉE pour le client !');
+    console.warn('ChantierId utilisé:', chantierId);
+  }
 
   // ALERTE si le client voit des données du chantier principal
   if (chantierId === 'chantier-principal' && userProfile?.chantierId !== 'chantier-principal') {
@@ -46,7 +55,9 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
   const renderContent = () => {
     switch (currentView) {
       case 'overview':
-        return <ClientOverview stats={stats} entreprises={entreprises} devis={devis} onNavigate={setCurrentView} />;
+        return <ClientOverview stats={stats} onNavigate={setCurrentView} />;
+      case 'entreprises':
+        return <ClientEntreprises entreprises={entreprises} onNavigate={setCurrentView} />;
       case 'chat':
         return <ClientChat chantierId={chantierId} userProfile={userProfile} />;
       case 'documents':
@@ -55,7 +66,7 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
           ...d,
           entrepriseNom: entreprises.find(e => e.id === d.entrepriseId)?.nom || 'Entreprise inconnue'
         }));
-        return <ClientDocuments devis={devisAvecEntreprise} />;
+        return <ClientDocuments devis={devisAvecEntreprise} chantierId={chantierId} onReload={reloadData} />;
       case 'planning':
         return <ClientPlanning chantierId={chantierId} />;
       case 'paiements':
@@ -132,6 +143,24 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
 
       {/* Contenu principal */}
       <main className="max-w-7xl mx-auto px-4 py-6">
+        {/* Message si aucune donnée disponible */}
+        {!loading && entreprises.length === 0 && devis.length === 0 && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 mb-6">
+            <div className="flex items-start space-x-3">
+              <AlertCircle className="w-6 h-6 text-yellow-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-yellow-800 mb-2">Chantier en cours de configuration</h3>
+                <p className="text-sm text-yellow-700 mb-2">
+                  Votre chantier est en cours de configuration par votre professionnel.
+                  Les entreprises, devis et autres informations apparaîtront ici une fois qu'ils auront été ajoutés.
+                </p>
+                <p className="text-xs text-yellow-600">
+                  Chantier ID: <code className="bg-yellow-100 px-2 py-1 rounded">{chantierId}</code>
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         {renderContent()}
       </main>
     </div>
@@ -139,7 +168,7 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
 }
 
 // Vue d'ensemble pour le client
-function ClientOverview({ stats, entreprises, devis, onNavigate }: any) {
+function ClientOverview({ stats, onNavigate }: any) {
   const progression = Math.round((stats.devisValides / Math.max(stats.devisValides + stats.devisEnAttente, 1)) * 100);
 
   return (
@@ -160,7 +189,10 @@ function ClientOverview({ stats, entreprises, devis, onNavigate }: any) {
 
       {/* Statistiques */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <button
+          onClick={() => onNavigate('entreprises')}
+          className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-blue-200 transition-all cursor-pointer w-full text-left"
+        >
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-blue-100 rounded-lg">
               <User className="w-5 h-5 text-blue-600" />
@@ -170,9 +202,12 @@ function ClientOverview({ stats, entreprises, devis, onNavigate }: any) {
               <p className="text-xl font-bold text-gray-800">{stats.entreprises}</p>
             </div>
           </div>
-        </div>
+        </button>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <button
+          onClick={() => onNavigate('documents')}
+          className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-yellow-200 transition-all cursor-pointer w-full text-left"
+        >
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-yellow-100 rounded-lg">
               <Clock className="w-5 h-5 text-yellow-600" />
@@ -182,9 +217,12 @@ function ClientOverview({ stats, entreprises, devis, onNavigate }: any) {
               <p className="text-xl font-bold text-gray-800">{stats.devisEnAttente}</p>
             </div>
           </div>
-        </div>
+        </button>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <button
+          onClick={() => onNavigate('documents')}
+          className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-green-200 transition-all cursor-pointer w-full text-left"
+        >
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-green-100 rounded-lg">
               <CheckCircle className="w-5 h-5 text-green-600" />
@@ -194,9 +232,12 @@ function ClientOverview({ stats, entreprises, devis, onNavigate }: any) {
               <p className="text-xl font-bold text-gray-800">{stats.devisValides}</p>
             </div>
           </div>
-        </div>
+        </button>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <button
+          onClick={() => onNavigate('paiements')}
+          className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-purple-200 transition-all cursor-pointer w-full text-left"
+        >
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-purple-100 rounded-lg">
               <CreditCard className="w-5 h-5 text-purple-600" />
@@ -206,7 +247,7 @@ function ClientOverview({ stats, entreprises, devis, onNavigate }: any) {
               <p className="text-xl font-bold text-gray-800">{stats.commandesActives}</p>
             </div>
           </div>
-        </div>
+        </button>
       </div>
 
       {/* Actions rapides */}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calendar, Clock, CheckCircle, User, MapPin, Phone, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, CheckCircle, User } from 'lucide-react';
 import { useChantierData } from '../../hooks/useChantierData';
 import { unifiedEtapesService, type Etape } from '../../firebase/unified-services';
 
@@ -9,7 +9,7 @@ interface ClientPlanningProps {
 
 export function ClientPlanning({ chantierId }: ClientPlanningProps) {
   // Utiliser les vraies données du chantier
-  const { rendezVous: vraisRendezVous, commandes, entreprises } = useChantierData(chantierId);
+  const { rendezVous: vraisRendezVous, entreprises } = useChantierData(chantierId);
 
   // DEBUG pour comprendre pourquoi les rendez-vous ne s'affichent pas côté client
   useEffect(() => {
@@ -23,45 +23,11 @@ export function ClientPlanning({ chantierId }: ClientPlanningProps) {
       console.log('📅 Structure rendez-vous client:', vraisRendezVous.slice(0, 2).map(rv => ({
         titre: rv.titre,
         dateDebut: rv.dateDebut,
-        dateHeure: rv.dateHeure,
-        date: rv.date
+        dateFin: rv.dateFin,
+        entrepriseId: rv.entrepriseId
       })));
     }
   }, [vraisRendezVous, chantierId]);
-
-  // Utiliser les vraies données ou données vierges (plus de démo)
-  const [rendezVousDemo] = useState([
-    {
-      id: '1',
-      titre: 'Visite de chantier - Début des travaux',
-      date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // Dans 2 jours
-      heure: '09:00',
-      entreprise: 'Plomberie Martin',
-      secteur: 'Sanitaire',
-      statut: 'planifie',
-      notes: 'Début des travaux de plomberie'
-    },
-    {
-      id: '2',
-      titre: 'Livraison matériaux',
-      date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // Dans 5 jours
-      heure: '14:00',
-      entreprise: 'Électricité Dupont',
-      secteur: 'Électricité',
-      statut: 'planifie',
-      notes: 'Livraison des équipements électriques'
-    },
-    {
-      id: '3',
-      titre: 'Point d\'avancement',
-      date: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000), // Dans 10 jours
-      heure: '16:00',
-      entreprise: 'Réunion',
-      secteur: 'Général',
-      statut: 'planifie',
-      notes: 'Réunion de suivi avec le professionnel'
-    }
-  ]);
 
   const [etapes, setEtapes] = useState<any[]>([]);
 
@@ -141,7 +107,7 @@ export function ClientPlanning({ chantierId }: ClientPlanningProps) {
         {/* Utiliser vraies données + démo si vide */}
         {(() => {
           const rendezVousAffiches = vraisRendezVous; // Utiliser SEULEMENT les vraies données
-          const rdvFuturs = rendezVousAffiches.filter(rdv => isFuture(rdv.dateDebut || rdv.dateHeure || rdv.date));
+          const rdvFuturs = rendezVousAffiches.filter(rdv => isFuture(rdv.dateDebut));
 
           return rdvFuturs.length === 0 ? (
             <div className="text-center py-8">
@@ -151,10 +117,10 @@ export function ClientPlanning({ chantierId }: ClientPlanningProps) {
           ) : (
             <div className="space-y-4">
               {rdvFuturs
-                .sort((a, b) => (a.dateDebut || a.dateHeure || a.date).getTime() - (b.dateDebut || b.dateHeure || b.date).getTime())
+                .sort((a, b) => a.dateDebut.getTime() - b.dateDebut.getTime())
                 .map((rdv) => {
-                  const rdvDate = rdv.dateDebut || rdv.dateHeure || rdv.date;
-                  const entrepriseNom = rdv.entreprise || entreprises.find(e => e.id === rdv.entrepriseId)?.nom || 'Entreprise';
+                  const rdvDate = rdv.dateDebut;
+                  const entrepriseNom = entreprises.find(e => e.id === rdv.entrepriseId)?.nom || 'Entreprise';
                   return (
                     <div key={rdv.id} className={`border rounded-xl p-4 ${isToday(rdvDate) ? 'border-primary-300 bg-primary-50' : 'border-gray-200'
                       }`}>
@@ -180,7 +146,7 @@ export function ClientPlanning({ chantierId }: ClientPlanningProps) {
                         <div className="flex items-center space-x-2">
                           <Clock className="w-4 h-4 text-gray-500" />
                           <span className="text-gray-700">
-                            {rdv.heure || rdvDate?.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                            {rdvDate?.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
                         <div className="flex items-center space-x-2">

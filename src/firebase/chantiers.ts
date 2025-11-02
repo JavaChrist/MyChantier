@@ -97,7 +97,6 @@ export const chantierService = {
   // Récupérer un chantier spécifique
   async getById(id: string): Promise<Chantier | null> {
     try {
-      const docRef = doc(db, 'chantiers', id);
       const docSnap = await getDocs(query(collection(db, 'chantiers'), where('__name__', '==', id)));
 
       if (!docSnap.empty) {
@@ -116,6 +115,20 @@ export const chantierService = {
     } catch (error) {
       console.error('Erreur récupération chantier:', error);
       return null;
+    }
+  },
+
+  // Récupérer tous les chantiers (pour l'admin)
+  async getAllChantiers(): Promise<Array<{ id: string; nom: string }>> {
+    try {
+      const snapshot = await getDocs(collection(db, 'chantiers'));
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        nom: doc.data().nom || doc.id
+      }));
+    } catch (error) {
+      console.error('Erreur récupération chantiers:', error);
+      return [];
     }
   }
 };

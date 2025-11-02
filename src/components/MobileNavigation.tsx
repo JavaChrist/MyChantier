@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   Menu,
   X
@@ -22,6 +22,7 @@ const navItems = [
   { id: 'planning', label: 'Planning', iconType: 'planning' as const },
   { id: 'paiements', label: 'Paiements', iconType: 'paiements' as const },
   { id: 'assurances', label: 'Documents', iconType: 'documents' as const },
+  { id: 'users', label: 'Utilisateurs', iconType: 'users' as const }
 ];
 
 export function MobileNavigation({ currentView, onViewChange, userProfile, onLogout }: MobileNavigationProps) {
@@ -31,8 +32,6 @@ export function MobileNavigation({ currentView, onViewChange, userProfile, onLog
     onViewChange(view);
     setIsOpen(false);
   };
-
-  const currentItem = navItems.find(item => item.id === currentView);
 
   return (
     <>

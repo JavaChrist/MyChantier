@@ -1,15 +1,38 @@
-import { useState } from 'react';
-import { FileText, CheckCircle, Clock, AlertCircle, Download, Eye, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { FileText, CheckCircle, Download, X, FolderOpen } from 'lucide-react';
 import { Modal } from '../Modal';
+import { unifiedDevisService, unifiedDocumentsService } from '../../firebase/unified-services';
 
 interface ClientDocumentsProps {
   devis: any[];
+  chantierId: string;
+  onReload?: () => void;
 }
 
-export function ClientDocuments({ devis }: ClientDocumentsProps) {
-  const [selectedDevis, setSelectedDevis] = useState<any>(null);
+export function ClientDocuments({ devis, chantierId, onReload }: ClientDocumentsProps) {
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [validationAction, setValidationAction] = useState<{ devis: any; decision: 'valide' | 'refuse' } | null>(null);
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(true);
+
+  // Charger les documents administratifs
+  useEffect(() => {
+    loadDocuments();
+  }, [chantierId]);
+
+  const loadDocuments = async () => {
+    try {
+      setLoadingDocs(true);
+      const docs = await unifiedDocumentsService.getByChantier(chantierId);
+      setDocuments(docs);
+      console.log(`✅ Client: ${docs.length} documents administratifs chargés`);
+    } catch (error) {
+      console.error('Erreur chargement documents:', error);
+      setDocuments([]);
+    } finally {
+      setLoadingDocs(false);
+    }
+  };
 
   const getStatutColor = (statut: string) => {
     switch (statut) {
@@ -42,25 +65,41 @@ export function ClientDocuments({ devis }: ClientDocumentsProps) {
     setShowValidationModal(true);
   };
 
-  const confirmValidation = () => {
+  const confirmValidation = async () => {
     if (!validationAction) return;
 
-    // TODO: Intégrer avec Firebase pour sauvegarder la décision
-    console.log(`Client ${validationAction.decision} le devis:`, validationAction.devis.id);
+    try {
+      const { devis: devisItem, decision } = validationAction;
 
-    // Simuler la mise à jour du statut (en attendant Firebase)
-    const updatedDevis = devis.map(d =>
-      d.id === validationAction.devis.id
-        ? { ...d, statut: validationAction.decision }
-        : d
-    );
+      console.log(`🔄 Client ${decision} le devis:`, devisItem.id);
 
-    setShowValidationModal(false);
-    setValidationAction(null);
+      // Sauvegarder la décision dans Firebase
+      await unifiedDevisService.update(chantierId, devisItem.id, {
+        statut: decision,
+        dateValidation: new Date(),
+        validePar: 'client'
+      });
 
-    // Pour la démo, on simule le changement sans recharger
-    // TODO: Intégrer avec Firebase pour persister le changement
-    console.log('✅ Décision enregistrée (simulation)');
+      console.log('✅ Décision enregistrée dans Firebase');
+
+      setShowValidationModal(false);
+      setValidationAction(null);
+
+      // Recharger les données si la fonction est fournie
+      if (onReload) {
+        await onReload();
+      }
+
+      // Message de confirmation
+      alert(decision === 'valide'
+        ? '✅ Devis validé avec succès !\n\nLe professionnel en sera informé.'
+        : '❌ Devis refusé.\n\nLe professionnel en sera informé et pourra vous proposer une révision.'
+      );
+
+    } catch (error) {
+      console.error('Erreur sauvegarde décision:', error);
+      alert('❌ Erreur lors de l\'enregistrement de votre décision. Veuillez réessayer.');
+    }
   };
 
   return (
@@ -183,6 +222,83 @@ export function ClientDocuments({ devis }: ClientDocumentsProps) {
           <p>• <strong>Validez ou refusez</strong> directement depuis cette interface</p>
           <p>• <strong>Contactez</strong> votre professionnel via la messagerie si vous avez des questions</p>
         </div>
+      </div>
+
+      {/* Documents administratifs */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-indigo-100 rounded-lg">
+              <FolderOpen className="w-6 h-6 text-indigo-600" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-gray-800">Documents administratifs</h2>
+              <p className="text-sm text-gray-600">Contrats, attestations et autres documents officiels</p>
+            </div>
+          </div>
+          <div className="text-sm text-gray-500">
+            {documents.length} document{documents.length > 1 ? 's' : ''}
+          </div>
+        </div>
+
+        {loadingDocs ? (
+          <div className="text-center py-8">
+            <div className="w-12 h-12 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-gray-500">Chargement des documents...</p>
+          </div>
+        ) : documents.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FolderOpen className="w-8 h-8 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-600 mb-2">Aucun document administratif</h3>
+            <p className="text-gray-500">
+              Les documents officiels (contrats, attestations, etc.) apparaîtront ici
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {documents.map((doc: any) => (
+              <div
+                key={doc.id}
+                className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all"
+              >
+                <div className="flex items-start space-x-3 mb-3">
+                  <div className="p-2 bg-indigo-100 rounded">
+                    <FileText className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-medium text-gray-800">{doc.nom}</h4>
+                    <p className="text-sm text-gray-600">{doc.type}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Ajouté le {doc.dateAjout?.toLocaleDateString('fr-FR')}
+                    </p>
+                  </div>
+                </div>
+
+                {doc.description && (
+                  <p className="text-sm text-gray-600 mb-3">{doc.description}</p>
+                )}
+
+                {doc.fichierUrl ? (
+                  <a
+                    href={doc.fichierUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full inline-flex items-center justify-center space-x-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg transition-colors text-sm"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Télécharger</span>
+                  </a>
+                ) : (
+                  <div className="w-full text-center py-2 bg-gray-100 text-gray-500 rounded-lg text-sm">
+                    Document en préparation
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Modale de confirmation */}

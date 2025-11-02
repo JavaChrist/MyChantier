@@ -376,6 +376,7 @@ export function EntreprisesManager() {
           <DevisManager
             entrepriseId={showDevis}
             entrepriseName={entreprises.find(e => e.id === showDevis)?.nom || ''}
+            chantierId={chantierId || 'chantier-principal'}
           />
         </Modal>
       )}

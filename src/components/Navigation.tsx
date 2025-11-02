@@ -1,11 +1,8 @@
-import React from 'react';
 import {
   Download,
   Wifi,
-  WifiOff,
   Smartphone
 } from 'lucide-react';
-import { AppIcon } from './Icon';
 import { NavigationIcon } from './NavigationIcon';
 import { usePWA } from '../hooks/usePWA';
 import { UserHeader } from './auth/UserHeader';
@@ -25,11 +22,12 @@ const navItems = [
   { id: 'planning', label: 'Planning', iconType: 'planning' as const },
   { id: 'etapes', label: 'Étapes', iconType: 'etapes' as const },
   { id: 'paiements', label: 'Paiements', iconType: 'paiements' as const },
-  { id: 'assurances', label: 'Documents', iconType: 'documents' as const }
+  { id: 'assurances', label: 'Documents', iconType: 'documents' as const },
+  { id: 'users', label: 'Utilisateurs', iconType: 'users' as const }
 ];
 
 export function Navigation({ currentView, onViewChange, userProfile, onLogout }: NavigationProps) {
-  const { isInstallable, installApp, isInstalled, isOnline } = usePWA();
+  const { isInstallable, installApp } = usePWA();
 
   return (
     <nav className="bg-gray-800 border-r border-gray-700 w-64 min-h-screen p-4">

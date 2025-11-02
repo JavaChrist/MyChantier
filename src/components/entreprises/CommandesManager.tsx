@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, FileText, Calendar, Euro, Check, X, AlertCircle, Upload, Download, Eye, Mail, ArrowRight } from 'lucide-react';
+import { Plus, FileText, Check, X, AlertCircle, Upload, Download, Eye, Mail, ArrowRight } from 'lucide-react';
 import { commandesService, devisService } from '../../firebase/entreprises';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../firebase/config';
@@ -114,9 +114,9 @@ export function CommandesManager({ entrepriseId, entrepriseName }: CommandesMana
           const fileUrl = await uploadDevisSigneFile(entrepriseId, commandeId, devisSigneFile);
           // Mettre à jour la commande avec l'URL du devis signé
           await commandesService.update(entrepriseId, commandeId, { devisSigneUrl: fileUrl });
-        } catch (uploadError) {
+        } catch (uploadError: any) {
           console.error('Erreur upload devis signé:', uploadError);
-          alert(`Erreur lors de l'upload du devis signé: ${uploadError.message}`);
+          alert(`Erreur lors de l'upload du devis signé: ${uploadError?.message || 'Erreur inconnue'}`);
         }
       }
 
@@ -351,7 +351,7 @@ function CommandeForm({
     dateCommande: '',
     dateDebutPrevue: '',
     dateFinPrevue: '',
-    statut: 'commandee' as const
+    statut: 'commandee' as 'commandee' | 'en-cours' | 'terminee' | 'annulee'
   });
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);

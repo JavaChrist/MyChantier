@@ -6,13 +6,13 @@ import {
   CreditCard,
   Shield,
   MessageCircle,
-  CheckSquare
+  CheckSquare,
+  UserCog
 } from 'lucide-react';
 
 interface NavigationIconProps {
-  type: 'dashboard' | 'entreprises' | 'prestations' | 'planning' | 'etapes' | 'paiements' | 'documents' | 'chat';
+  type: 'dashboard' | 'entreprises' | 'prestations' | 'planning' | 'etapes' | 'paiements' | 'documents' | 'chat' | 'users';
   isActive?: boolean;
-  size?: number;
 }
 
 // Mapping des icônes et couleurs par type
@@ -56,10 +56,15 @@ const ICON_CONFIG = {
     icon: MessageCircle,
     bgColor: 'bg-purple-500',
     textColor: 'text-white'
+  },
+  users: {
+    icon: UserCog,
+    bgColor: 'bg-pink-600',
+    textColor: 'text-white'
   }
 };
 
-export function NavigationIcon({ type, isActive = false, size = 24 }: NavigationIconProps) {
+export function NavigationIcon({ type, isActive = false }: NavigationIconProps) {
   const config = ICON_CONFIG[type];
   const IconComponent = config.icon;
 

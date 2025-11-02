@@ -89,39 +89,110 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
     console.log('✅ Chargement depuis Firebase V2');
   };
 
+  // Charger tous les chantiers depuis Firebase V2 - Approche dynamique et migration
+  const loadAllChantiersFromFirebase = async (): Promise<Chantier[]> => {
+    try {
+      console.log('🔍 Chargement dynamique de tous les chantiers depuis Firebase...');
+
+      const { collection, getDocs } = await import('firebase/firestore');
+      const { db } = await import('../../firebase/config');
+
+      const allChantiers: Chantier[] = [];
+
+      // 1. Récupérer tous les documents de la collection "chantiers"
+      const chantiersSnapshot = await getDocs(collection(db, 'chantiers'));
+
+      console.log(`📋 ${chantiersSnapshot.docs.length} documents chantiers trouvés dans Firebase`);
+
+      // 2. Pour chaque chantier existant dans Firebase, charger ses données
+      for (const chantierDoc of chantiersSnapshot.docs) {
+        const chantierId = chantierDoc.id;
+        try {
+          console.log(`📋 Chargement chantier: ${chantierId}`);
+
+          // Charger les infos depuis la sous-collection "info"
+          const infoSnapshot = await getDocs(collection(db, `chantiers/${chantierId}/info`));
+
+          if (infoSnapshot.docs.length > 0) {
+            const data = infoSnapshot.docs[0].data();
+            const chantier: Chantier = {
+              id: chantierId,
+              nom: data.nom || 'Chantier sans nom',
+              description: data.description || '',
+              clientNom: data.clientNom || '',
+              clientEmail: data.clientEmail || '',
+              clientTelephone: data.clientTelephone || '',
+              adresse: data.adresse || '',
+              dateDebut: data.dateDebut?.toDate() || new Date(),
+              dateFinPrevue: data.dateFinPrevue?.toDate() || new Date(),
+              budget: data.budget || 0,
+              statut: data.statut || 'planifie',
+              professionalId: data.professionalId || professionalId,
+              dateCreation: data.dateCreation?.toDate() || new Date(),
+              dateModification: data.dateModification?.toDate() || new Date()
+            };
+
+            allChantiers.push(chantier);
+            console.log(`✅ Chantier ${chantierId} chargé:`, chantier.nom);
+          } else {
+            // Si pas de sous-collection info, utiliser les données du document principal
+            const docData = chantierDoc.data();
+            if (docData.nom) {
+              const chantier: Chantier = {
+                id: chantierId,
+                nom: docData.nom || 'Chantier sans nom',
+                description: docData.description || '',
+                clientNom: docData.clientNom || '',
+                clientEmail: docData.clientEmail || '',
+                clientTelephone: docData.clientTelephone || '',
+                adresse: docData.adresse || '',
+                dateDebut: docData.dateDebut?.toDate() || new Date(),
+                dateFinPrevue: docData.dateFinPrevue?.toDate() || new Date(),
+                budget: docData.budget || 0,
+                statut: docData.statut || 'planifie',
+                professionalId: docData.professionalId || professionalId,
+                dateCreation: docData.dateCreation?.toDate() || new Date(),
+                dateModification: docData.dateModification?.toDate() || new Date()
+              };
+              allChantiers.push(chantier);
+              console.log(`✅ Chantier ${chantierId} chargé depuis le document principal:`, chantier.nom);
+            } else {
+              console.warn(`⚠️ Chantier ${chantierId} n'a pas de nom, ignoré`);
+            }
+          }
+        } catch (error) {
+          console.warn(`⚠️ Erreur chargement chantier ${chantierId}:`, error);
+        }
+      }
+
+      // Trier par date de modification (plus récent en premier)
+      allChantiers.sort((a, b) => b.dateModification.getTime() - a.dateModification.getTime());
+
+      console.log(`🎉 ${allChantiers.length} chantiers chargés depuis Firebase V2`);
+      return allChantiers;
+
+    } catch (error) {
+      console.error('Erreur chargement chantiers Firebase:', error);
+      return [];
+    }
+  };
+
   const loadChantiers = async () => {
     try {
       setLoading(true);
 
-      // Obtenir le chantier principal depuis Firebase V2
-      const chantierPrincipalActuel = await getChantierPrincipal();
+      // Charger TOUS les chantiers depuis Firebase V2
+      const tousLesChantiers = await loadAllChantiersFromFirebase();
 
-      // Charger les autres chantiers sauvegardés
-      const savedChantiers = localStorage.getItem('chantiers');
-      const chantiersFromStorage = savedChantiers ? JSON.parse(savedChantiers) : [];
+      // Si aucun chantier trouvé dans Firebase, utiliser le fallback
+      if (tousLesChantiers.length === 0) {
+        const chantierPrincipalFallback = await getChantierPrincipal();
+        setChantiers([chantierPrincipalFallback]);
+        return;
+      }
 
-      // Reconstituer les dates
-      const chantiersWithDates = chantiersFromStorage.map((chantier: any) => ({
-        ...chantier,
-        dateDebut: new Date(chantier.dateDebut),
-        dateFinPrevue: new Date(chantier.dateFinPrevue),
-        dateFinReelle: chantier.dateFinReelle ? new Date(chantier.dateFinReelle) : undefined,
-        dateCreation: new Date(chantier.dateCreation),
-        dateModification: new Date(chantier.dateModification)
-      }));
-
-      // Combiner chantier Grohens-Pitet + autres chantiers (éviter doublons)
-      const chantiersUniques = chantiersWithDates.filter((c: Chantier) => c.id !== 'chantier-grohens-pitet');
-
-      // Supprimer les doublons par nom ET par ID
-      const chantiersFiltrés = chantiersUniques.filter((chantier: Chantier, index: number, array: Chantier[]) =>
-        array.findIndex((c: Chantier) => c.nom === chantier.nom || c.id === chantier.id) === index
-      );
-
-      const tousLesChantiers = [chantierPrincipalActuel, ...chantiersFiltrés];
       setChantiers(tousLesChantiers);
-
-      console.log('🔧 CHARGEMENT: Chantiers chargés:', tousLesChantiers.map(c => ({ nom: c.nom, id: c.id })));
+      console.log('🔧 CHARGEMENT V2: Tous les chantiers chargés depuis Firebase:', tousLesChantiers.map(c => ({ nom: c.nom, id: c.id })));
     } catch (error) {
       console.error('Erreur chargement chantiers:', error);
       const fallbackChantier = await getChantierPrincipal();
@@ -146,15 +217,12 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
 
   const handleCreateChantier = async (chantierData: Omit<Chantier, 'id'>) => {
     try {
+      console.log('🏗️ DÉBUT CRÉATION CHANTIER:', chantierData.nom);
+
       // 1. Créer le chantier avec un ID unique
       const chantierId = `chantier-${Date.now()}`;
-      const newChantier: Chantier = {
-        ...chantierData,
-        id: chantierId,
-        professionalId,
-        dateCreation: new Date(),
-        dateModification: new Date()
-      };
+      console.log('📋 ID généré:', chantierId);
+      // Plus besoin de créer newChantier ici, on sauvegarde directement dans Firebase
 
       // 2. Préparer les informations client (SANS créer le compte pour éviter la déconnexion)
       if (chantierData.clientEmail && chantierData.clientEmail.trim()) {
@@ -191,20 +259,81 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
         setShowSuccessModal(true);
       }
 
-      // 3. Ajouter à la liste sans toucher au localStorage pour l'instant
-      const tousChantiers = [...chantiers, newChantier];
-      setChantiers(tousChantiers);
+      // 3. Sauvegarder le chantier dans Firebase V2
+      try {
+        console.log('💾 DÉBUT SAUVEGARDE FIREBASE pour:', chantierId);
+        const { addDoc, setDoc, doc, collection, Timestamp } = await import('firebase/firestore');
+        const { db } = await import('../../firebase/config');
 
-      // Sauvegarder SEULEMENT les nouveaux chantiers (pas le principal)
-      const nouveauxChantiers = tousChantiers.filter(c => c.id !== 'chantier-principal');
-      localStorage.setItem('chantiers', JSON.stringify(nouveauxChantiers));
+        // Convertir les dates en objets Date valides
+        const dateDebut = chantierData.dateDebut instanceof Date
+          ? chantierData.dateDebut
+          : new Date(chantierData.dateDebut);
 
-      console.log('💾 Nouveau chantier ajouté:', newChantier.nom);
+        const dateFinPrevue = chantierData.dateFinPrevue instanceof Date
+          ? chantierData.dateFinPrevue
+          : new Date(chantierData.dateFinPrevue);
+
+        // Vérifier que les dates sont valides
+        if (isNaN(dateDebut.getTime())) {
+          console.error('❌ Date de début invalide:', chantierData.dateDebut);
+          throw new Error('Date de début invalide');
+        }
+        if (isNaN(dateFinPrevue.getTime())) {
+          console.error('❌ Date de fin prévue invalide:', chantierData.dateFinPrevue);
+          throw new Error('Date de fin prévue invalide');
+        }
+
+        console.log('✅ Dates validées:', { dateDebut, dateFinPrevue });
+
+        const chantierDataForFirebase = {
+          nom: chantierData.nom,
+          description: chantierData.description,
+          clientNom: chantierData.clientNom,
+          clientEmail: chantierData.clientEmail,
+          clientTelephone: chantierData.clientTelephone,
+          adresse: chantierData.adresse,
+          dateDebut: Timestamp.fromDate(dateDebut),
+          dateFinPrevue: Timestamp.fromDate(dateFinPrevue),
+          budget: chantierData.budget || 0,
+          statut: chantierData.statut,
+          professionalId: professionalId,
+          dateCreation: Timestamp.fromDate(new Date()),
+          dateModification: Timestamp.fromDate(new Date())
+        };
+
+        console.log('📦 Données à sauvegarder:', chantierDataForFirebase);
+
+        // IMPORTANT : Créer d'abord le document parent dans la collection "chantiers"
+        console.log(`🔄 Création document parent: chantiers/${chantierId}`);
+        await setDoc(doc(db, 'chantiers', chantierId), chantierDataForFirebase);
+        console.log(`✅ Document parent créé: chantiers/${chantierId}`);
+
+        // Puis créer aussi la sous-collection "info" pour compatibilité
+        console.log(`🔄 Création sous-collection: chantiers/${chantierId}/info`);
+        await addDoc(collection(db, `chantiers/${chantierId}/info`), chantierDataForFirebase);
+        console.log(`✅ Sous-collection créée: chantiers/${chantierId}/info`);
+
+        console.log('✅✅✅ Chantier sauvegardé dans Firebase V2 avec succès !');
+      } catch (error) {
+        console.error('❌❌❌ ERREUR SAUVEGARDE FIREBASE:', error);
+        console.error('Détails de l\'erreur:', JSON.stringify(error, null, 2));
+        throw error; // Relancer l'erreur pour qu'elle soit capturée par le catch principal
+      }
+
+      // 4. Recharger tous les chantiers depuis Firebase
+      console.log('🔄 Rechargement de la liste des chantiers...');
+      await loadChantiers();
+      console.log('✅ Liste des chantiers rechargée');
       setShowNewChantierModal(false);
+      console.log('🎉 CRÉATION CHANTIER TERMINÉE AVEC SUCCÈS');
 
     } catch (error) {
-      console.error('Erreur création chantier:', error);
-      setSuccessMessage('❌ Erreur lors de la création du chantier');
+      console.error('❌❌❌ ERREUR CRÉATION CHANTIER:', error);
+      console.error('Type d\'erreur:', typeof error);
+      console.error('Message:', (error as any)?.message);
+      console.error('Code:', (error as any)?.code);
+      setSuccessMessage(`❌ Erreur lors de la création du chantier: ${(error as any)?.message || 'Erreur inconnue'}`);
       setShowSuccessModal(true);
     }
   };
@@ -316,36 +445,74 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
     if (!chantierToDelete) return;
 
     try {
-      // PROTECTION ABSOLUE du chantier principal
-      if (chantierToDelete.id === 'chantier-principal' ||
+      // PROTECTION : Protéger le chantier Grohens-Pitet (données réelles)
+      if (chantierToDelete.id === 'chantier-grohens-pitet' ||
         chantierToDelete.nom.includes('Rénovation ancien') ||
         chantierToDelete.clientNom === 'Grohens Pitet') {
-        setSuccessMessage('🚨 ERREUR : Ce chantier ne peut pas être supprimé !\n\nIl contient vos vraies données. Seuls les chantiers de test peuvent être supprimés.');
+        setSuccessMessage('🚨 ERREUR : Ce chantier ne peut pas être supprimé !\n\nIl contient vos vraies données.');
         setShowSuccessModal(true);
         setShowDeleteConfirmModal(false);
         setChantierToDelete(null);
         return;
       }
 
-      console.log('🗑️ Suppression du chantier de test:', chantierToDelete.nom, 'ID:', chantierToDelete.id);
+      console.log('🗑️ DÉBUT SUPPRESSION COMPLÈTE du chantier:', chantierToDelete.nom, 'ID:', chantierToDelete.id);
 
-      // Supprimer SEULEMENT de localStorage (pas le chantier principal)
+      const { collection, getDocs, deleteDoc, doc } = await import('firebase/firestore');
+      const { db } = await import('../../firebase/config');
+
+      const chantierId = chantierToDelete.id!;
+
+      // 1. Supprimer toutes les sous-collections
+      const subCollections = ['info', 'entreprises', 'devis', 'commandes', 'paiements', 'documents', 'planning', 'etapes', 'messages'];
+
+      for (const subCol of subCollections) {
+        try {
+          console.log(`🗑️ Suppression de ${subCol}...`);
+          const snapshot = await getDocs(collection(db, `chantiers/${chantierId}/${subCol}`));
+          console.log(`📋 ${snapshot.docs.length} documents trouvés dans ${subCol}`);
+
+          // Supprimer chaque document de la sous-collection
+          for (const docSnapshot of snapshot.docs) {
+            await deleteDoc(doc(db, `chantiers/${chantierId}/${subCol}`, docSnapshot.id));
+          }
+
+          if (snapshot.docs.length > 0) {
+            console.log(`✅ ${snapshot.docs.length} documents supprimés de ${subCol}`);
+          }
+        } catch (error) {
+          console.warn(`⚠️ Erreur suppression ${subCol}:`, error);
+        }
+      }
+
+      // 2. Supprimer le document parent
+      console.log(`🗑️ Suppression du document parent: chantiers/${chantierId}`);
+      await deleteDoc(doc(db, 'chantiers', chantierId));
+      console.log(`✅ Document parent supprimé`);
+
+      // 3. Nettoyer localStorage aussi
       const saved = localStorage.getItem('chantiers');
-      const savedChantiers = saved ? JSON.parse(saved) : [];
-      const updatedSaved = savedChantiers.filter((c: any) => c.id !== chantierToDelete.id);
-      localStorage.setItem('chantiers', JSON.stringify(updatedSaved));
+      if (saved) {
+        const savedChantiers = JSON.parse(saved);
+        const updatedSaved = savedChantiers.filter((c: any) => c.id !== chantierId);
+        localStorage.setItem('chantiers', JSON.stringify(updatedSaved));
+      }
 
-      // Recharger tous les chantiers (le principal sera toujours là)
+      // 4. Recharger la liste
       await loadChantiers();
 
-      console.log('✅ Chantier de test supprimé avec succès');
+      console.log('✅✅✅ Chantier complètement supprimé de Firebase');
+      setSuccessMessage(`✅ Chantier "${chantierToDelete.nom}" supprimé avec succès !`);
+      setShowSuccessModal(true);
 
       setShowDeleteConfirmModal(false);
       setChantierToDelete(null);
     } catch (error) {
-      console.error('Erreur suppression chantier:', error);
-      setSuccessMessage('❌ Erreur lors de la suppression du chantier');
+      console.error('❌ Erreur suppression chantier:', error);
+      setSuccessMessage(`❌ Erreur lors de la suppression du chantier: ${(error as any)?.message || 'Erreur inconnue'}`);
       setShowSuccessModal(true);
+      setShowDeleteConfirmModal(false);
+      setChantierToDelete(null);
     }
   };
 
@@ -861,6 +1028,37 @@ function NewChantierForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Valider les champs requis
+    if (!formData.nom.trim()) {
+      alert('Le nom du chantier est requis');
+      return;
+    }
+    if (!formData.clientEmail.trim()) {
+      alert('L\'email du client est requis');
+      return;
+    }
+    if (!formData.dateDebut) {
+      alert('La date de début est requise');
+      return;
+    }
+    if (!formData.dateFinPrevue) {
+      alert('La date de fin prévue est requise');
+      return;
+    }
+
+    // Créer et valider les dates
+    const dateDebut = new Date(formData.dateDebut);
+    const dateFinPrevue = new Date(formData.dateFinPrevue);
+
+    if (isNaN(dateDebut.getTime())) {
+      alert('La date de début est invalide');
+      return;
+    }
+    if (isNaN(dateFinPrevue.getTime())) {
+      alert('La date de fin prévue est invalide');
+      return;
+    }
+
     onSave({
       nom: formData.nom,
       description: formData.description,
@@ -868,8 +1066,8 @@ function NewChantierForm({
       clientEmail: formData.clientEmail,
       clientTelephone: formData.clientTelephone,
       adresse: formData.adresse,
-      dateDebut: new Date(formData.dateDebut),
-      dateFinPrevue: new Date(formData.dateFinPrevue),
+      dateDebut: dateDebut,
+      dateFinPrevue: dateFinPrevue,
       budget: formData.budget ? parseFloat(formData.budget) : undefined,
       statut: formData.statut,
       professionalId,
@@ -973,10 +1171,11 @@ function NewChantierForm({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
-            Date de début
+            Date de début *
           </label>
           <input
             type="date"
+            required
             value={formData.dateDebut}
             onChange={(e) => setFormData(prev => ({ ...prev, dateDebut: e.target.value }))}
             className="input-field w-full"
@@ -985,10 +1184,11 @@ function NewChantierForm({
 
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
-            Date de fin prévue
+            Date de fin prévue *
           </label>
           <input
             type="date"
+            required
             value={formData.dateFinPrevue}
             onChange={(e) => setFormData(prev => ({ ...prev, dateFinPrevue: e.target.value }))}
             className="input-field w-full"

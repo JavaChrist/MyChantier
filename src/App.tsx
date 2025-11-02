@@ -9,12 +9,12 @@ import { CalendarPlanning } from './components/planning/CalendarPlanning';
 import { EtapesManager } from './components/etapes/EtapesManager';
 import { PaiementsGlobaux } from './components/paiements/PaiementsGlobaux';
 import { AssurancesManager } from './components/assurances/AssurancesManager';
+import { UsersManager } from './components/admin/UsersManager';
 import { PWAPrompt } from './components/PWAPrompt';
 import { UpdatePrompt } from './components/UpdatePrompt';
 import { ChantierProvider, useChantier } from './contexts/ChantierContext';
 import { ChantierSelector } from './components/chantiers/ChantierSelector';
 import { ChantierHeader } from './components/chantiers/ChantierHeader';
-import { ChantierChat } from './components/chat/ChantierChat';
 import { LoginForm } from './components/auth/LoginForm';
 import { useAuth } from './hooks/useAuth';
 import { ClientInterface } from './components/client/ClientInterface';
@@ -54,6 +54,8 @@ function AppContent({ userProfile, onLogout }: { userProfile: any; onLogout: () 
         return <PaiementsGlobaux />;
       case 'assurances':
         return <AssurancesManager />;
+      case 'users':
+        return <UsersManager />;
       default:
         return <Dashboard onNavigate={setCurrentView} />;
     }
@@ -219,14 +221,13 @@ function ClientApp({ userProfile, onLogout }: { userProfile: any; onLogout: () =
   // Tous les chantiers sont maintenant valides avec la structure V2
   // Plus besoin de vérifier si le chantier existe, la structure V2 gère cela automatiquement
 
+  // Les clients n'ont PAS besoin de ChantierProvider car leur chantier est fixe
   return (
-    <ChantierProvider>
-      <ClientInterface
-        userProfile={userProfile}
-        chantierId={clientChantierId}
-        onLogout={onLogout}
-      />
-    </ChantierProvider>
+    <ClientInterface
+      userProfile={userProfile}
+      chantierId={clientChantierId}
+      onLogout={onLogout}
+    />
   );
 }
 
