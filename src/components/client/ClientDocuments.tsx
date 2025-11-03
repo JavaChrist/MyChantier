@@ -7,9 +7,10 @@ interface ClientDocumentsProps {
   devis: any[];
   chantierId: string;
   onReload?: () => void;
+  entreprises?: any[];
 }
 
-export function ClientDocuments({ devis, chantierId, onReload }: ClientDocumentsProps) {
+export function ClientDocuments({ devis, chantierId, onReload, entreprises = [] }: ClientDocumentsProps) {
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [validationAction, setValidationAction] = useState<{ devis: any; decision: 'valide' | 'refuse' } | null>(null);
   const [documents, setDocuments] = useState<any[]>([]);
@@ -258,45 +259,53 @@ export function ClientDocuments({ devis, chantierId, onReload }: ClientDocuments
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {documents.map((doc: any) => (
-              <div
-                key={doc.id}
-                className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all"
-              >
-                <div className="flex items-start space-x-3 mb-3">
-                  <div className="p-2 bg-indigo-100 rounded">
-                    <FileText className="w-5 h-5 text-indigo-600" />
+            {documents.map((doc: any) => {
+              const entreprise = entreprises.find(e => e.id === doc.entrepriseId);
+              return (
+                <div
+                  key={doc.id}
+                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all"
+                >
+                  <div className="flex items-start space-x-3 mb-3">
+                    <div className="p-2 bg-indigo-100 rounded">
+                      <FileText className="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-gray-800">{doc.nom}</h4>
+                      <p className="text-sm text-gray-600">{doc.type}</p>
+                      {entreprise && (
+                        <p className="text-xs font-medium text-indigo-600 mt-1">
+                          🏢 {entreprise.nom}
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-500 mt-1">
+                        Ajouté le {doc.dateUpload?.toLocaleDateString('fr-FR')}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <h4 className="font-medium text-gray-800">{doc.nom}</h4>
-                    <p className="text-sm text-gray-600">{doc.type}</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Ajouté le {doc.dateAjout?.toLocaleDateString('fr-FR')}
-                    </p>
-                  </div>
+
+                  {doc.description && (
+                    <p className="text-sm text-gray-600 mb-3">{doc.description}</p>
+                  )}
+
+                  {doc.fichierUrl ? (
+                    <a
+                      href={doc.fichierUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full inline-flex items-center justify-center space-x-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg transition-colors text-sm"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Télécharger</span>
+                    </a>
+                  ) : (
+                    <div className="w-full text-center py-2 bg-gray-100 text-gray-500 rounded-lg text-sm">
+                      Document en préparation
+                    </div>
+                  )}
                 </div>
-
-                {doc.description && (
-                  <p className="text-sm text-gray-600 mb-3">{doc.description}</p>
-                )}
-
-                {doc.fichierUrl ? (
-                  <a
-                    href={doc.fichierUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full inline-flex items-center justify-center space-x-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg transition-colors text-sm"
-                  >
-                    <Download className="w-4 h-4" />
-                    <span>Télécharger</span>
-                  </a>
-                ) : (
-                  <div className="w-full text-center py-2 bg-gray-100 text-gray-500 rounded-lg text-sm">
-                    Document en préparation
-                  </div>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

@@ -36,13 +36,13 @@ export function usePWA() {
       console.log('🌐 Connexion rétablie');
     };
 
-    const handleOffline = () => {
-      setIsOnline(false);
-      // Log seulement si vraiment hors ligne (pas au démarrage)
-      if (navigator.onLine === false) {
-        console.warn('📴 Mode hors ligne détecté');
-      }
-    };
+  const handleOffline = () => {
+    setIsOnline(false);
+    // Log seulement si vraiment hors ligne (pas au démarrage)
+    if (navigator.onLine === false) {
+      console.warn('📴 Mode hors ligne détecté');
+    }
+  };
 
     // Vérifier si l'app est déjà installée
     if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {

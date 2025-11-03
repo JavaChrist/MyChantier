@@ -43,7 +43,7 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
           ...d,
           entrepriseNom: entreprises.find(e => e.id === d.entrepriseId)?.nom || 'Entreprise inconnue'
         }));
-        return <ClientDocuments devis={devisAvecEntreprise} chantierId={chantierId} onReload={reloadData} />;
+        return <ClientDocuments devis={devisAvecEntreprise} chantierId={chantierId} onReload={reloadData} entreprises={entreprises} />;
       case 'planning':
         return <ClientPlanning chantierId={chantierId} />;
       case 'paiements':
@@ -81,10 +81,10 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden max-w-full">
       {/* Header client */}
-      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 py-4">
+      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30 max-w-full">
+        <div className="max-w-7xl mx-auto px-3 md:px-4 py-3 md:py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               {/* Bouton menu mobile */}
@@ -138,7 +138,7 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
       {mobileMenuOpen && (
         <div className="lg:hidden fixed inset-0 z-50">
           <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setMobileMenuOpen(false)} />
-          <div className="fixed inset-y-0 left-0 w-80 max-w-full bg-white shadow-xl">
+          <div className="fixed inset-y-0 left-0 w-80 max-w-[calc(100vw-2rem)] bg-white shadow-xl">
             <div className="flex flex-col h-full">
               {/* Header menu mobile */}
               <div className="flex items-center justify-between p-4 border-b border-gray-200">
@@ -193,7 +193,7 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
       )}
 
       {/* Contenu principal */}
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      <main className="max-w-7xl mx-auto px-3 md:px-4 py-4 md:py-6 max-w-full overflow-x-hidden">
         {/* Message si aucune donnée disponible */}
         {!loading && entreprises.length === 0 && devis.length === 0 && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 mb-6">

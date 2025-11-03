@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Calendar, MapPin, Users, ArrowRight, Edit2, LogOut, Trash2, FileText } from 'lucide-react';
+import { Plus, Calendar, MapPin, Users, ArrowRight, Edit2, LogOut, Trash2 } from 'lucide-react';
 import { AppIcon } from '../Icon';
 import type { Chantier } from '../../firebase/chantiers';
 import { useChantier } from '../../contexts/ChantierContext';
@@ -78,16 +78,10 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
   };
 
   useEffect(() => {
-    // FORCER la restauration du chantier principal au démarrage
-    forceRestoreChantierPrincipal();
     loadChantiers();
   }, [professionalId]);
 
-  const forceRestoreChantierPrincipal = async () => {
-    console.log('🚨 FORCE RESTAURATION du chantier principal');
-    // Plus besoin de forcer, on charge depuis Firebase V2
-    console.log('✅ Chargement depuis Firebase V2');
-  };
+  // Ancien code de restauration supprimé - tout est maintenant en V2
 
   // Charger tous les chantiers depuis Firebase V2 - Approche dynamique et migration
   const loadAllChantiersFromFirebase = async (): Promise<Chantier[]> => {
@@ -202,21 +196,9 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
     }
   };
 
-  const saveChantiers = (newChantiers: Chantier[]) => {
-    // Sauvegarder SEULEMENT les nouveaux chantiers (pas le principal)
-    const chantiersToSave = newChantiers.filter(c => c.id !== 'chantier-principal');
-    localStorage.setItem('chantiers', JSON.stringify(chantiersToSave));
-
-    console.log('💾 Sauvegarde des chantiers:', chantiersToSave.map(c => ({ nom: c.nom, id: c.id })));
-  };
+  // localStorage non utilisé - tout est dans Firebase V2
 
   const handleSelectChantier = (chantier: Chantier) => {
-    console.log('📋 Sélection chantier:', {
-      nom: chantier.nom,
-      id: chantier.id,
-      budget: chantier.budget,
-      hasBudget: !!chantier.budget
-    });
     setChantierActuel(chantier);
     setChangtierId(chantier.id!);
   };
@@ -382,17 +364,7 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
       const { createUserWithEmailAndPassword, updateProfile, signOut } = await import('firebase/auth');
       const { auth } = await import('../../firebase/config');
 
-      console.log('🔧 Configuration accès client pour le chantier principal:', clientEmail);
-
-      // Mettre à jour les informations du chantier principal
-      const updatedChantier = { ...chantier, clientEmail };
-      localStorage.setItem('chantier-principal-info', JSON.stringify(updatedChantier));
-
-      // Mettre à jour dans la liste affichée
-      const updatedChantiers = chantiers.map(c =>
-        c.id === 'chantier-principal' ? updatedChantier : c
-      );
-      setChantiers(updatedChantiers);
+      console.log('🔧 Configuration accès client pour le chantier:', clientEmail);
 
       try {
         // Créer le compte client
@@ -405,7 +377,7 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
           email: clientEmail,
           displayName: chantier.clientNom,
           role: 'client',
-          chantierId: 'chantier-principal'
+          chantierId: chantier.id
         });
 
         // Se déconnecter du compte client
@@ -529,50 +501,31 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
     try {
       console.log(`🔄 Modification chantier ${selectedChantier.id}`);
 
-      const updatedChantier: Chantier = {
-        ...chantierData,
-        id: selectedChantier.id,
-        professionalId,
-        dateCreation: selectedChantier.dateCreation,
-        dateModification: new Date()
+      const { doc, setDoc, Timestamp } = await import('firebase/firestore');
+      const { db } = await import('../../firebase/config');
+
+      const chantierDataForFirebase = {
+        nom: chantierData.nom,
+        description: chantierData.description,
+        clientNom: chantierData.clientNom,
+        clientEmail: chantierData.clientEmail,
+        clientTelephone: chantierData.clientTelephone,
+        adresse: chantierData.adresse,
+        dateDebut: Timestamp.fromDate(chantierData.dateDebut),
+        dateFinPrevue: Timestamp.fromDate(chantierData.dateFinPrevue),
+        budget: chantierData.budget || 0,
+        statut: chantierData.statut,
+        professionalId: professionalId,
+        dateCreation: Timestamp.fromDate(selectedChantier.dateCreation),
+        dateModification: Timestamp.fromDate(new Date())
       };
 
-      // Sauvegarder dans Firebase V2
-      if (selectedChantier.id === 'chantier-grohens-pitet') {
-        // Sauvegarder dans Firebase V2
-        const { doc, updateDoc, Timestamp } = await import('firebase/firestore');
-        const { db } = await import('../../firebase/config');
+      // Mettre à jour le document parent
+      await setDoc(doc(db, 'chantiers', selectedChantier.id!), chantierDataForFirebase);
+      console.log('✅ Chantier modifié dans Firebase V2');
 
-        const chantierInfoRef = doc(db, `chantiers/${selectedChantier.id}/info`, 'details');
-        await updateDoc(chantierInfoRef, {
-          nom: chantierData.nom,
-          description: chantierData.description,
-          clientNom: chantierData.clientNom,
-          clientEmail: chantierData.clientEmail,
-          clientTelephone: chantierData.clientTelephone,
-          adresse: chantierData.adresse,
-          dateDebut: Timestamp.fromDate(chantierData.dateDebut),
-          dateFinPrevue: Timestamp.fromDate(chantierData.dateFinPrevue),
-          budget: chantierData.budget,
-          statut: chantierData.statut,
-          notes: chantierData.notes,
-          dateModification: Timestamp.fromDate(new Date())
-        });
-
-        console.log('✅ Chantier modifié dans Firebase V2');
-      } else {
-        // Autres chantiers : localStorage pour l'instant
-        const updatedChantiers = chantiers.map(c =>
-          c.id === selectedChantier.id ? updatedChantier : c
-        );
-        saveChantiers(updatedChantiers);
-      }
-
-      // Mettre à jour l'affichage
-      const updatedChantiers = chantiers.map(c =>
-        c.id === selectedChantier.id ? updatedChantier : c
-      );
-      setChantiers(updatedChantiers);
+      // Recharger la liste
+      await loadChantiers();
 
       setShowEditChantierModal(false);
       setSelectedChantier(null);
@@ -588,104 +541,7 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
   };
 
 
-  const handleExportData = async () => {
-    try {
-      setSuccessMessage('🔄 Export en cours...\n\nVeuillez patienter pendant la sauvegarde de toutes vos données.');
-      setShowSuccessModal(true);
-
-      const { exportChantierPrincipalData, afficherResumeChantier } = await import('../../utils/exportData');
-
-      console.log('🔄 Début de l\'export des données...');
-      const exportedData = await exportChantierPrincipalData();
-
-      afficherResumeChantier(exportedData);
-
-      setSuccessMessage(
-        `✅ Sauvegarde terminée !\n\n` +
-        `📁 Fichier téléchargé : chantier-principal-backup-${new Date().toISOString().split('T')[0]}.json\n\n` +
-        `📊 Données sauvegardées :\n` +
-        `• ${exportedData.stats.entreprises} entreprises\n` +
-        `• ${exportedData.stats.devis} devis\n` +
-        `• ${exportedData.stats.commandes} commandes\n` +
-        `• ${exportedData.stats.paiements} paiements\n` +
-        `• ${exportedData.stats.documents} documents\n` +
-        `• ${exportedData.stats.rendezVous} rendez-vous\n\n` +
-        `🛡️ Vos données sont maintenant sécurisées !`
-      );
-
-    } catch (error: any) {
-      console.error('❌ Erreur export:', error);
-      setSuccessMessage(`❌ Erreur lors de l'export :\n${error.message}\n\nVérifiez la console pour plus de détails.`);
-    }
-  };
-
-  const handleMigration = async () => {
-    try {
-      // Demander confirmation
-      const confirmation = window.confirm(
-        '🚨 MIGRATION VERS STRUCTURE V2\n\n' +
-        'Cette opération va :\n' +
-        '1. Migrer toutes vos données vers une nouvelle structure Firebase\n' +
-        '2. Corriger définitivement les problèmes d\'isolation\n' +
-        '3. Permettre une gestion propre par chantier\n\n' +
-        '⚠️ IMPORTANT : Assurez-vous d\'avoir sauvegardé vos données avant !\n\n' +
-        'Continuer la migration ?'
-      );
-
-      if (!confirmation) return;
-
-      setSuccessMessage('🔄 Migration V2 en cours...\n\nMigration de vos données vers la nouvelle structure.\nCela peut prendre quelques minutes.');
-      setShowSuccessModal(true);
-
-      // Import du service de migration
-      const { MigrationV2 } = await import('../../utils/migration');
-
-      // Demander à l'utilisateur de fournir le fichier de sauvegarde
-      const fileInput = document.createElement('input');
-      fileInput.type = 'file';
-      fileInput.accept = '.json';
-
-      const backupData = await new Promise((resolve, reject) => {
-        fileInput.onchange = async (e: any) => {
-          try {
-            const file = e.target.files[0];
-            if (!file) {
-              reject(new Error('Aucun fichier sélectionné'));
-              return;
-            }
-
-            const text = await file.text();
-            const data = JSON.parse(text);
-            console.log('📁 Fichier de sauvegarde chargé:', data.stats);
-            resolve(data);
-          } catch (error) {
-            reject(error);
-          }
-        };
-
-        fileInput.click();
-      });
-
-      // Lancer la migration
-      await MigrationV2.migrerChantierPrincipal(backupData);
-
-      setSuccessMessage(
-        `🎉 MIGRATION V2 TERMINÉE !\n\n` +
-        `✅ Structure Firebase modernisée\n` +
-        `✅ Données isolées par chantier\n` +
-        `✅ Problèmes de mélange résolus\n\n` +
-        `📋 Prochaines étapes :\n` +
-        `1. Vérifier que vos données sont bien migrées\n` +
-        `2. Tester les fonctionnalités\n` +
-        `3. Nettoyer les anciennes collections\n\n` +
-        `🚀 Votre application est maintenant optimisée !`
-      );
-
-    } catch (error: any) {
-      console.error('❌ Erreur migration:', error);
-      setSuccessMessage(`❌ Erreur lors de la migration :\n${error.message}\n\nVos données originales sont préservées.`);
-    }
-  };
+  // Fonctions de migration supprimées - tout est maintenant en V2 nativement
 
   const getStatutColor = (statut: string) => {
     switch (statut) {
@@ -759,29 +615,13 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
         </div>
 
         {/* Actions */}
-        <div className="flex justify-center mb-8 space-x-4">
+        <div className="flex justify-center mb-8">
           <button
             onClick={() => setShowNewChantierModal(true)}
             className="btn-primary flex items-center space-x-2"
           >
             <Plus className="w-5 h-5" />
             <span>Nouveau chantier</span>
-          </button>
-
-          <button
-            onClick={handleExportData}
-            className="btn-secondary flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white"
-          >
-            <FileText className="w-5 h-5" />
-            <span>Sauvegarder mes données</span>
-          </button>
-
-          <button
-            onClick={handleMigration}
-            className="btn-secondary flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white"
-          >
-            <ArrowRight className="w-5 h-5" />
-            <span>Migration V2</span>
           </button>
         </div>
 
@@ -839,8 +679,8 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
                         <Users className="w-4 h-4" />
                       </button>
 
-                      {/* Bouton de suppression - masqué pour le chantier principal */}
-                      {chantier.id !== 'chantier-principal' && (
+                      {/* Bouton de suppression */}
+                      {chantier.id !== 'chantier-grohens-pitet' && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();

@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Plus, Search, Phone, Mail, FileText, CreditCard, ShoppingCart, Edit2, Trash2, Wrench, Zap, Hammer, Paintbrush, DoorOpen } from 'lucide-react';
-import { Icon } from '../Icon';
-import { entreprisesService, devisService, commandesService, paiementsService } from '../../firebase/entreprises';
-import type { Entreprise, Devis, Commande, Paiement } from '../../firebase/entreprises';
+import { entreprisesService } from '../../firebase/entreprises';
+import type { Entreprise } from '../../firebase/entreprises';
 import { useChantier } from '../../contexts/ChantierContext';
 import { useChantierData } from '../../hooks/useChantierData';
 import { Modal } from '../Modal';
@@ -73,31 +72,16 @@ export function EntreprisesManager() {
       };
 
       if (selectedEntreprise?.id) {
-        // Mise à jour
-        if (chantierId === 'chantier-principal') {
-          // Ancien système pour le chantier principal
-          await entreprisesService.update(selectedEntreprise.id, finalData);
-        } else {
-          // Nouveau système pour les autres chantiers
-          await entreprisesService.updateInChantier(chantierId, selectedEntreprise.id, finalData);
-        }
+        // Mise à jour - Système unifié V2
+        await entreprisesService.updateInChantier(chantierId, selectedEntreprise.id, finalData);
       } else {
-        // Création
-        if (chantierId === 'chantier-principal') {
-          // Ancien système pour le chantier principal
-          await entreprisesService.create({
-            ...finalData,
-            dateCreation: new Date()
-          });
-        } else {
-          // Nouveau système pour les autres chantiers
-          console.log(`🏗️ Création entreprise dans chantier ${chantierId} via EntreprisesManager`);
-          const newId = await entreprisesService.createInChantier(chantierId, {
-            ...finalData,
-            dateCreation: new Date()
-          });
-          console.log(`✅ Entreprise créée avec ID: ${newId}`);
-        }
+        // Création - Système unifié V2
+        console.log(`🏗️ Création entreprise dans chantier ${chantierId} via EntreprisesManager`);
+        const newId = await entreprisesService.createInChantier(chantierId, {
+          ...finalData,
+          dateCreation: new Date()
+        });
+        console.log(`✅ Entreprise créée avec ID: ${newId}`);
       }
       await reloadData();
       setIsModalOpen(false);
@@ -376,7 +360,7 @@ export function EntreprisesManager() {
           <DevisManager
             entrepriseId={showDevis}
             entrepriseName={entreprises.find(e => e.id === showDevis)?.nom || ''}
-            chantierId={chantierId || 'chantier-principal'}
+            chantierId={chantierId || ''}
           />
         </Modal>
       )}
@@ -407,7 +391,7 @@ export function EntreprisesManager() {
           <PaiementsManager
             entrepriseId={showPaiements}
             entrepriseName={entreprises.find(e => e.id === showPaiements)?.nom || ''}
-            chantierId={chantierId || 'chantier-principal'}
+            chantierId={chantierId || ''}
           />
         </Modal>
       )}

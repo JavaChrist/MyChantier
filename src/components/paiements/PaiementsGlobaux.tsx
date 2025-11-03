@@ -185,13 +185,6 @@ export function PaiementsGlobaux() {
 
   const budgetActuel = budgets.find(b => b.statut === 'actif');
 
-  // Debug budgets
-  console.log('💰 PaiementsGlobaux - État budgets:', {
-    chantierId: chantierId,
-    totalBudgets: budgets.length,
-    budgetActuel: budgetActuel ? { nom: budgetActuel.nom, montant: budgetActuel.montantActuel } : null
-  });
-
   if (dataLoading) {
     return (
       <div className="mobile-padding flex items-center justify-center min-h-64">

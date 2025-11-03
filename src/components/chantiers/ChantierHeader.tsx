@@ -14,14 +14,6 @@ export function ChantierHeader() {
 
   if (!chantierActuel) return null;
 
-  // Debug budget
-  console.log('💰 ChantierHeader - Budget du chantier:', {
-    nom: chantierActuel.nom,
-    budget: chantierActuel.budget,
-    typeBudget: typeof chantierActuel.budget,
-    afficherBudget: !!chantierActuel.budget
-  });
-
   return (
     <div className="bg-primary-600 text-white p-3 md:p-4 border-b border-primary-500">
       <div className="flex items-center justify-between">

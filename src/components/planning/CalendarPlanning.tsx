@@ -22,35 +22,13 @@ export function CalendarPlanning() {
   const { chantierId, chantierActuel } = useChantier();
   const { entreprises, commandes, rendezVous, loading: dataLoading, reloadData } = useChantierData(chantierId);
 
-  // DEBUG pour comprendre la structure des rendez-vous après migration
-  useEffect(() => {
-    console.log('🔍 DEBUG PLANNING PROFESSIONNEL:', {
-      chantierId: chantierId,
-      total: rendezVous.length,
-      premier: rendezVous[0],
-      entreprises: entreprises.length
-    });
-
-    if (rendezVous.length > 0) {
-      console.log('📅 Premiers rendez-vous:', rendezVous.slice(0, 3).map(rv => ({
-        titre: rv.titre,
-        dateDebut: rv.dateDebut,
-        dateHeure: rv.dateHeure,
-        entrepriseId: rv.entrepriseId,
-        type: rv.type
-      })));
-    } else {
-      console.log('⚠️ Aucun rendez-vous trouvé pour le planning');
-    }
-  }, [rendezVous.length, chantierId, entreprises.length]);
+  // Système de chargement des rendez-vous via useChantierData
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewType, setViewType] = useState<ViewType>('month');
   const [showEventModal, setShowEventModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<RendezVous | null>(null);
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Plus besoin de loadData car useChantierData s'en charge
@@ -198,23 +176,14 @@ export function CalendarPlanning() {
         return;
       }
 
-      // Adapter pour la structure V2
-      const finalEventData = {
-        ...eventData,
-        // Convertir dateHeure vers dateDebut/dateFin si nécessaire
-        dateDebut: eventData.dateDebut || eventData.dateHeure || new Date(),
-        dateFin: eventData.dateFin || (eventData.dateHeure ? new Date(eventData.dateHeure.getTime() + 60 * 60 * 1000) : new Date()),
-        // Convertir confirme vers statut
-        statut: eventData.confirme ? 'confirme' : (eventData.statut || 'planifie')
-      };
-
+      // Les données sont déjà au format V2 depuis le formulaire
       const { unifiedPlanningService } = await import('../../firebase/unified-services');
 
       if (selectedEvent?.id) {
-        await unifiedPlanningService.update(chantierId, selectedEvent.id, finalEventData);
+        await unifiedPlanningService.update(chantierId, selectedEvent.id, eventData);
         console.log('✅ Rendez-vous modifié en V2');
       } else {
-        await unifiedPlanningService.create(chantierId, finalEventData);
+        await unifiedPlanningService.create(chantierId, eventData);
         console.log('✅ Nouveau rendez-vous créé en V2');
       }
 
@@ -255,38 +224,15 @@ export function CalendarPlanning() {
       setSelectedEvent(null);
       setShowDeleteConfirm(false);
 
-      setSuccessMessage(`Rendez-vous "${selectedEvent.titre}" supprimé avec succès !`);
-      setShowSuccessMessage(true);
+      console.log(`✅ Rendez-vous "${selectedEvent.titre}" supprimé avec succès`);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur suppression rendez-vous:', error);
-      setSuccessMessage(`❌ Erreur lors de la suppression : ${error.message}`);
-      setShowSuccessMessage(true);
+      alert(`❌ Erreur lors de la suppression : ${error.message}`);
     }
   };
 
-  const handleFixRendezVousLinks = async () => {
-    if (!chantierId) return;
-
-    try {
-      const { fixRendezVousEntreprises } = await import('../../utils/fixRendezVous');
-
-      console.log('🔄 Début de la correction des liens...');
-      const correctionCount = await fixRendezVousEntreprises(chantierId);
-
-      if (correctionCount > 0) {
-        setSuccessMessage(`✅ Correction terminée !\n\n${correctionCount} rendez-vous ont été reliés aux bonnes entreprises.\n\nRechargez la page pour voir les couleurs corrigées.`);
-      } else {
-        setSuccessMessage('ℹ️ Aucune correction nécessaire.\n\nTous les liens semblent déjà corrects.');
-      }
-      setShowSuccessMessage(true);
-
-    } catch (error) {
-      console.error('❌ Erreur correction:', error);
-      setSuccessMessage(`❌ Erreur lors de la correction :\n${error.message}`);
-      setShowSuccessMessage(true);
-    }
-  };
+  // Fonction de correction supprimée - tout est maintenant en V2 avec liens corrects
 
   if (dataLoading) {
     return (
@@ -311,25 +257,14 @@ export function CalendarPlanning() {
             }
           </p>
         </div>
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => handleDateClick(new Date())}
-            className="btn-primary flex items-center space-x-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Nouveau RDV</span>
-            <span className="sm:hidden">RDV</span>
-          </button>
-
-          <button
-            onClick={handleFixRendezVousLinks}
-            className="btn-secondary flex items-center space-x-2 bg-orange-600 hover:bg-orange-700 text-white"
-          >
-            <Check className="w-4 h-4" />
-            <span className="hidden sm:inline">Corriger liens</span>
-            <span className="sm:hidden">Fix</span>
-          </button>
-        </div>
+        <button
+          onClick={() => handleDateClick(new Date())}
+          className="btn-primary flex items-center space-x-2"
+        >
+          <Plus className="w-4 h-4" />
+          <span className="hidden sm:inline">Nouveau RDV</span>
+          <span className="sm:hidden">RDV</span>
+        </button>
       </div>
 
       {/* Contrôles de navigation */}
@@ -423,30 +358,6 @@ export function CalendarPlanning() {
             onDelete={selectedEvent ? handleDeleteEvent : undefined}
           />
         )}
-      </Modal>
-
-      {/* Modal de succès */}
-      <Modal
-        isOpen={showSuccessMessage}
-        onClose={() => setShowSuccessMessage(false)}
-        title="✅ Correction des liens"
-        size="md"
-      >
-        <div className="space-y-4">
-          <div className="bg-green-600/10 border border-green-600/20 rounded-lg p-4">
-            <pre className="text-sm text-green-400 whitespace-pre-wrap font-sans">
-              {successMessage}
-            </pre>
-          </div>
-          <div className="flex justify-end">
-            <button
-              onClick={() => setShowSuccessMessage(false)}
-              className="btn-primary"
-            >
-              Compris
-            </button>
-          </div>
-        </div>
       </Modal>
 
       {/* Modal de confirmation de suppression */}
@@ -744,19 +655,19 @@ function RendezVousForm({
 
   useEffect(() => {
     if (rendezVous) {
-      // Gestion structure V2 (dateDebut) et ancienne (dateHeure)
-      const rdvDate = rendezVous.dateDebut || rendezVous.dateHeure || new Date();
+      // Format V2 : utiliser dateDebut
+      const rdvDate = rendezVous.dateDebut || new Date();
 
       setFormData({
         titre: rendezVous.titre || '',
         entrepriseId: rendezVous.entrepriseId || '',
         date: rdvDate.toISOString().split('T')[0],
         heure: rdvDate.toTimeString().slice(0, 5),
-        lieu: rendezVous.lieu || '',
-        type: rendezVous.type || 'visite-chantier',
+        lieu: rendezVous.description || '', // description en V2
+        type: rendezVous.type || 'reunion',
         notes: rendezVous.notes || '',
         statut: rendezVous.statut || 'planifie',
-        confirme: rendezVous.statut === 'confirme' || rendezVous.confirme || false
+        confirme: rendezVous.statut === 'confirme' || false
       });
     } else if (selectedDate) {
       setFormData(prev => ({
@@ -770,18 +681,21 @@ function RendezVousForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const dateHeure = new Date(`${formData.date}T${formData.heure}`);
+    const dateDebut = new Date(`${formData.date}T${formData.heure}`);
+    const dateFin = new Date(dateDebut.getTime() + 60 * 60 * 1000); // +1 heure par défaut
 
+    // Format V2 avec dateDebut et dateFin
     onSave({
       titre: formData.titre,
+      description: formData.lieu, // Le "lieu" devient la description en V2
       entrepriseId: formData.entrepriseId,
-      dateHeure,
-      lieu: formData.lieu,
+      dateDebut,
+      dateFin,
       type: formData.type,
       notes: formData.notes,
       statut: formData.statut,
       confirme: formData.confirme
-    });
+    } as any);
   };
 
   return (
@@ -1021,22 +935,23 @@ function AgendaView({
     const endDate = new Date(now);
     endDate.setDate(endDate.getDate() + filterDays);
 
-    // Ajouter les rendez-vous
+    // Ajouter les rendez-vous (format V2 : dateDebut)
     rendezVous.forEach((rdv: any) => {
-      if (rdv.dateHeure >= now && rdv.dateHeure <= endDate) {
+      const rdvDate = rdv.dateDebut; // Format V2
+      if (rdvDate && rdvDate >= now && rdvDate <= endDate) {
         const entreprise = entreprises.find((e: any) => e.id === rdv.entrepriseId);
         if (filterEntreprise === 'all' || rdv.entrepriseId === filterEntreprise) {
           if (filterType === 'all' || filterType === 'rendez-vous') {
             events.push({
               id: `rdv-${rdv.id}`,
               type: 'rendez-vous',
-              date: rdv.dateHeure,
+              date: rdvDate,
               title: rdv.titre,
-              description: `${rdv.type} - ${rdv.lieu}`,
+              description: `${rdv.type || 'Rendez-vous'} ${rdv.description ? '- ' + rdv.description : ''}`,
               entrepriseId: rdv.entrepriseId,
               entrepriseNom: entreprise?.nom || 'Entreprise inconnue',
-              lieu: rdv.lieu,
-              statut: rdv.statut,
+              lieu: rdv.description || '',
+              statut: rdv.statut || 'planifie',
               data: rdv
             });
           }

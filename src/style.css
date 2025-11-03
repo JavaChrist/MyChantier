@@ -5,10 +5,30 @@
 @layer base {
   html {
     color-scheme: dark;
+    overflow-x: hidden;
+    max-width: 100vw;
+    /* Support des safe areas iPhone */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 
   body {
     @apply bg-gray-900 text-gray-100 font-sans antialiased;
+    overflow-x: hidden;
+    max-width: 100vw;
+    position: relative;
+  }
+
+  /* Correction pour iPhone - éviter le scroll horizontal */
+  * {
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
+  }
+
+  #app {
+    overflow-x: hidden;
+    max-width: 100vw;
+    width: 100%;
   }
 }
 
@@ -49,6 +69,7 @@
 
   .modal-content {
     @apply bg-gray-800 border border-gray-600 rounded-lg p-3 md:p-6 w-full relative z-10 mx-4;
+    max-width: calc(100vw - 2rem);
   }
 
   /* Classes utilitaires pour mobile */
@@ -133,5 +154,61 @@
   /* Case à cocher personnalisée */
   input[type="checkbox"] {
     @apply accent-primary-600;
+  }
+
+  /* Optimisation iPhone 16 Pro */
+  @media only screen and (max-width: 430px) {
+    .card,
+    .card-mobile {
+      @apply p-3;
+    }
+
+    .btn-primary,
+    .btn-secondary {
+      @apply px-3 py-2 text-sm;
+    }
+
+    .mobile-padding {
+      @apply p-3;
+    }
+
+    h1 {
+      @apply text-lg;
+    }
+
+    h2 {
+      @apply text-base;
+    }
+
+    /* Réduire les gaps sur très petit écran */
+    .mobile-grid {
+      @apply gap-3;
+    }
+
+    /* Tables scrollables sur mobile */
+    table {
+      font-size: 0.875rem;
+    }
+  }
+
+  /* Spécifique iPhone 16 Pro (393px width) */
+  @media only screen and (max-width: 393px) {
+    .card,
+    .card-mobile {
+      @apply p-2;
+    }
+
+    .mobile-padding {
+      @apply p-2;
+    }
+
+    .btn-primary,
+    .btn-secondary {
+      @apply px-2 py-1.5 text-xs;
+    }
+
+    .mobile-grid {
+      @apply gap-2;
+    }
   }
 }

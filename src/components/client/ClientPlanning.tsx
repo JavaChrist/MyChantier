@@ -11,23 +11,7 @@ export function ClientPlanning({ chantierId }: ClientPlanningProps) {
   // Utiliser les vraies données du chantier
   const { rendezVous: vraisRendezVous, entreprises } = useChantierData(chantierId);
 
-  // DEBUG pour comprendre pourquoi les rendez-vous ne s'affichent pas côté client
-  useEffect(() => {
-    console.log('🔍 DEBUG CLIENT PLANNING:', {
-      chantierId: chantierId,
-      rendezVousTotal: vraisRendezVous.length,
-      premier: vraisRendezVous[0]
-    });
-
-    if (vraisRendezVous.length > 0) {
-      console.log('📅 Structure rendez-vous client:', vraisRendezVous.slice(0, 2).map(rv => ({
-        titre: rv.titre,
-        dateDebut: rv.dateDebut,
-        dateFin: rv.dateFin,
-        entrepriseId: rv.entrepriseId
-      })));
-    }
-  }, [vraisRendezVous, chantierId]);
+  // Système de chargement des rendez-vous via useChantierData
 
   const [etapes, setEtapes] = useState<any[]>([]);
 

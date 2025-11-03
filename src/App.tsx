@@ -62,7 +62,7 @@ function AppContent({ userProfile, onLogout }: { userProfile: any; onLogout: () 
   };
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-gray-900 overflow-x-hidden max-w-full">
       {/* Header chantier */}
       <ChantierHeader />
 
@@ -75,7 +75,7 @@ function AppContent({ userProfile, onLogout }: { userProfile: any; onLogout: () 
       />
 
       {/* Layout desktop/mobile */}
-      <div className="flex">
+      <div className="flex max-w-full">
         {/* Navigation desktop - cachée sur mobile */}
         <div className="hidden lg:block">
           <Navigation
@@ -87,7 +87,7 @@ function AppContent({ userProfile, onLogout }: { userProfile: any; onLogout: () 
         </div>
 
         {/* Contenu principal */}
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto max-w-full">
           {renderContent()}
         </main>
       </div>
