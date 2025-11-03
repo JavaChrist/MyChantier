@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, CreditCard, Calendar, Euro, Check, X, AlertTriangle, Clock, DollarSign, FileText, Edit3 } from 'lucide-react';
-import { paiementsService, commandesService, devisService } from '../../firebase/entreprises';
-import type { Paiement, Commande, Devis } from '../../firebase/entreprises';
+import { commandesService, devisService } from '../../firebase/entreprises';
+import { unifiedPaiementsService } from '../../firebase/unified-services';
+import type { Paiement, Commande, Devis } from '../../firebase/unified-services';
 import { ConfirmModal } from '../ConfirmModal';
 import { Modal } from '../Modal';
 
 interface PaiementsManagerProps {
   entrepriseId: string;
   entrepriseName: string;
+  chantierId: string;
 }
 
-export function PaiementsManager({ entrepriseId, entrepriseName }: PaiementsManagerProps) {
+export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: PaiementsManagerProps) {
   const [paiements, setPaiements] = useState<Paiement[]>([]);
   const [commandes, setCommandes] = useState<Commande[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,12 +31,18 @@ export function PaiementsManager({ entrepriseId, entrepriseName }: PaiementsMana
   const loadData = async () => {
     try {
       setLoading(true);
-      const [paiementsData, commandesData] = await Promise.all([
-        paiementsService.getByEntreprise(entrepriseId),
+      console.log(`🔍 Chargement paiements pour entreprise ${entrepriseId} dans chantier ${chantierId}`);
+      
+      // Charger TOUS les paiements du chantier puis filtrer par entreprise
+      const [allPaiements, commandesData] = await Promise.all([
+        unifiedPaiementsService.getByChantier(chantierId),
         commandesService.getByEntreprise(entrepriseId)
       ]);
 
-      setPaiements(paiementsData);
+      const paiementsEntreprise = allPaiements.filter(p => p.entrepriseId === entrepriseId);
+      console.log(`✅ ${paiementsEntreprise.length} paiements chargés pour cette entreprise`);
+      
+      setPaiements(paiementsEntreprise);
       // Filtrer seulement les commandes actives (pas annulées)
       const commandesActives = commandesData.filter(cmd => cmd.statut !== 'annulee');
       setCommandes(commandesActives);
@@ -138,12 +146,19 @@ export function PaiementsManager({ entrepriseId, entrepriseName }: PaiementsMana
 
   const handleSavePaiement = async (paiementData: Omit<Paiement, 'id' | 'entrepriseId'>) => {
     try {
+      const fullPaiementData = {
+        ...paiementData,
+        entrepriseId: entrepriseId
+      };
+
       if (selectedPaiement?.id) {
         // Mise à jour
-        await paiementsService.update(entrepriseId, selectedPaiement.id, paiementData);
+        console.log(`🔄 Mise à jour paiement dans chantier ${chantierId}`);
+        await unifiedPaiementsService.update(chantierId, selectedPaiement.id, fullPaiementData);
       } else {
         // Création
-        await paiementsService.create(entrepriseId, paiementData);
+        console.log(`🏗️ Création paiement dans chantier ${chantierId}`);
+        await unifiedPaiementsService.create(chantierId, fullPaiementData);
       }
 
       await loadData();
@@ -163,7 +178,8 @@ export function PaiementsManager({ entrepriseId, entrepriseName }: PaiementsMana
   const confirmMarquerRegle = async () => {
     if (paiementToUpdate?.id) {
       try {
-        await paiementsService.update(entrepriseId, paiementToUpdate.id, {
+        console.log(`✅ Marquage paiement ${paiementToUpdate.id} comme réglé`);
+        await unifiedPaiementsService.update(chantierId, paiementToUpdate.id, {
           statut: 'regle',
           dateReglement: new Date()
         });
@@ -180,11 +196,18 @@ export function PaiementsManager({ entrepriseId, entrepriseName }: PaiementsMana
 
   const handleSaveCustomPaiements = async (paiementsData: Array<Omit<Paiement, 'id' | 'entrepriseId'>>) => {
     try {
+      console.log(`🏗️ Création échéancier de ${paiementsData.length} paiements dans chantier ${chantierId}`);
+      
       // Créer tous les paiements
       for (const paiement of paiementsData) {
-        await paiementsService.create(entrepriseId, paiement);
+        const fullPaiementData = {
+          ...paiement,
+          entrepriseId: entrepriseId
+        };
+        await unifiedPaiementsService.create(chantierId, fullPaiementData);
       }
 
+      console.log('✅ Échéancier de paiement créé avec succès');
       await loadData();
       setShowCustomPaiementsModal(false);
       setSelectedDevisForPaiements(null);

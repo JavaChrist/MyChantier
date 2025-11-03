@@ -310,7 +310,31 @@ export const unifiedPaiementsService = {
       datePrevue: Timestamp.fromDate(paiement.datePrevue),
       dateReglement: paiement.dateReglement ? Timestamp.fromDate(paiement.dateReglement) : null
     });
+    console.log(`✅ Paiement créé avec ID: ${docRef.id} dans chantiers/${chantierId}/paiements`);
     return docRef.id;
+  },
+
+  // Mettre à jour un paiement
+  async update(chantierId: string, paiementId: string, updates: Partial<Paiement>): Promise<void> {
+    const docRef = doc(db, `chantiers/${chantierId}/paiements`, paiementId);
+    const updateData: any = { ...updates };
+
+    // Convertir les dates en Timestamp si présentes
+    if (updateData.datePrevue) {
+      updateData.datePrevue = Timestamp.fromDate(updateData.datePrevue);
+    }
+    if (updateData.dateReglement) {
+      updateData.dateReglement = Timestamp.fromDate(updateData.dateReglement);
+    }
+
+    await updateDoc(docRef, updateData);
+    console.log(`✅ Paiement ${paiementId} mis à jour dans ${chantierId}`);
+  },
+
+  // Supprimer un paiement
+  async delete(chantierId: string, paiementId: string): Promise<void> {
+    await deleteDoc(doc(db, `chantiers/${chantierId}/paiements`, paiementId));
+    console.log(`✅ Paiement ${paiementId} supprimé de ${chantierId}`);
   }
 };
 
@@ -383,6 +407,83 @@ export const unifiedDocumentsService = {
   async delete(chantierId: string, documentId: string): Promise<void> {
     await deleteDoc(doc(db, `chantiers/${chantierId}/documents`, documentId));
     console.log(`✅ Document ${documentId} supprimé de ${chantierId}`);
+  }
+};
+
+export interface BudgetPrevisionnel {
+  id?: string;
+  nom: string;
+  description: string;
+  montantInitial: number;
+  montantActuel: number;
+  secteurs: {
+    sanitaire: number;
+    electricite: number;
+    carrelage: number;
+    menuiserie: number;
+    peinture: number;
+  };
+  dateCreation: Date;
+  dateModification: Date;
+  notes?: string;
+  statut: 'actif' | 'termine' | 'suspendu';
+}
+
+export const unifiedBudgetService = {
+  // Récupérer tous les budgets d'un chantier
+  async getByChantier(chantierId: string): Promise<BudgetPrevisionnel[]> {
+    try {
+      const q = query(
+        collection(db, `chantiers/${chantierId}/budgets`),
+        orderBy('dateCreation', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          dateCreation: data.dateCreation?.toDate() || new Date(),
+          dateModification: data.dateModification?.toDate() || new Date()
+        } as BudgetPrevisionnel;
+      });
+    } catch (error) {
+      console.error(`❌ Erreur chargement budgets ${chantierId}:`, error);
+      return [];
+    }
+  },
+
+  // Créer un budget
+  async create(chantierId: string, budget: Omit<BudgetPrevisionnel, 'id'>): Promise<string> {
+    const docRef = await addDoc(collection(db, `chantiers/${chantierId}/budgets`), {
+      ...budget,
+      dateCreation: Timestamp.fromDate(budget.dateCreation),
+      dateModification: Timestamp.fromDate(budget.dateModification)
+    });
+    console.log(`✅ Budget créé avec ID: ${docRef.id} dans chantiers/${chantierId}/budgets`);
+    return docRef.id;
+  },
+
+  // Mettre à jour un budget
+  async update(chantierId: string, budgetId: string, updates: Partial<BudgetPrevisionnel>): Promise<void> {
+    const docRef = doc(db, `chantiers/${chantierId}/budgets`, budgetId);
+    const updateData: any = {
+      ...updates,
+      dateModification: Timestamp.fromDate(new Date())
+    };
+
+    if (updateData.dateCreation) {
+      updateData.dateCreation = Timestamp.fromDate(updateData.dateCreation);
+    }
+
+    await updateDoc(docRef, updateData);
+    console.log(`✅ Budget ${budgetId} mis à jour dans ${chantierId}`);
+  },
+
+  // Supprimer un budget
+  async delete(chantierId: string, budgetId: string): Promise<void> {
+    await deleteDoc(doc(db, `chantiers/${chantierId}/budgets`, budgetId));
+    console.log(`✅ Budget ${budgetId} supprimé de ${chantierId}`);
   }
 };
 

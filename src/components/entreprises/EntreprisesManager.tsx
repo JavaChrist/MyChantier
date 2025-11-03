@@ -407,6 +407,7 @@ export function EntreprisesManager() {
           <PaiementsManager
             entrepriseId={showPaiements}
             entrepriseName={entreprises.find(e => e.id === showPaiements)?.nom || ''}
+            chantierId={chantierId || 'chantier-principal'}
           />
         </Modal>
       )}

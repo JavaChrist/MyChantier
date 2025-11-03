@@ -133,7 +133,7 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
             };
 
             allChantiers.push(chantier);
-            console.log(`✅ Chantier ${chantierId} chargé:`, chantier.nom);
+            console.log(`✅ Chantier ${chantierId} chargé:`, chantier.nom, `| Budget: ${chantier.budget}€`);
           } else {
             // Si pas de sous-collection info, utiliser les données du document principal
             const docData = chantierDoc.data();
@@ -211,6 +211,12 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
   };
 
   const handleSelectChantier = (chantier: Chantier) => {
+    console.log('📋 Sélection chantier:', {
+      nom: chantier.nom,
+      id: chantier.id,
+      budget: chantier.budget,
+      hasBudget: !!chantier.budget
+    });
     setChantierActuel(chantier);
     setChangtierId(chantier.id!);
   };

@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, CreditCard, Calendar, Euro, Check, X, AlertTriangle, Clock, DollarSign, TrendingUp, Edit2, Target } from 'lucide-react';
 import { entreprisesService, paiementsService } from '../../firebase/entreprises';
-import { budgetService } from '../../firebase/budget';
+import { unifiedBudgetService, unifiedPaiementsService, type BudgetPrevisionnel, type Paiement } from '../../firebase/unified-services';
 import { useChantier } from '../../contexts/ChantierContext';
 import { useChantierData } from '../../hooks/useChantierData';
-import type { Entreprise, Paiement } from '../../firebase/entreprises';
-import type { BudgetPrevisionnel } from '../../firebase/budget';
+import type { Entreprise } from '../../firebase/entreprises';
 import { Modal } from '../Modal';
 import { ConfirmModal } from '../ConfirmModal';
 
 export function PaiementsGlobaux() {
   const { chantierId, chantierActuel } = useChantier();
-  const { entreprises, paiements: paiementsData, loading: dataLoading } = useChantierData(chantierId);
+  const { entreprises, paiements: paiementsData, loading: dataLoading, reloadData } = useChantierData(chantierId);
 
   const [paiements, setPaiements] = useState<(Paiement & { entrepriseNom: string; secteur: string })[]>([]);
   const [budgets, setBudgets] = useState<BudgetPrevisionnel[]>([]);
@@ -20,6 +19,8 @@ export function PaiementsGlobaux() {
   const [filterType, setFilterType] = useState<string>('all');
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [selectedBudget, setSelectedBudget] = useState<BudgetPrevisionnel | null>(null);
+  const [showConfirmPaiementModal, setShowConfirmPaiementModal] = useState(false);
+  const [paiementToUpdate, setPaiementToUpdate] = useState<(Paiement & { entrepriseNom: string; secteur: string }) | null>(null);
 
   useEffect(() => {
     if (!dataLoading && entreprises.length >= 0) {
@@ -46,14 +47,16 @@ export function PaiementsGlobaux() {
 
   const loadBudgets = async () => {
     try {
-      if (chantierId === 'chantier-principal') {
-        // Charger les budgets existants seulement pour le chantier principal
-        const budgetsData = await budgetService.getAll();
-        setBudgets(budgetsData);
-      } else {
-        // Nouveaux chantiers = pas de budget pour l'instant
+      if (!chantierId) {
         setBudgets([]);
+        return;
       }
+
+      console.log(`🔍 Chargement budgets pour chantier ${chantierId}`);
+      // Utiliser le système unifié V2 pour TOUS les chantiers
+      const budgetsData = await unifiedBudgetService.getByChantier(chantierId);
+      console.log(`✅ ${budgetsData.length} budgets chargés`);
+      setBudgets(budgetsData);
     } catch (error) {
       console.error('Erreur chargement budgets:', error);
       setBudgets([]);
@@ -70,16 +73,48 @@ export function PaiementsGlobaux() {
     setShowBudgetModal(true);
   };
 
+  const handleMarquerRegle = (paiement: (Paiement & { entrepriseNom: string; secteur: string })) => {
+    setPaiementToUpdate(paiement);
+    setShowConfirmPaiementModal(true);
+  };
+
+  const confirmMarquerRegle = async () => {
+    if (!paiementToUpdate?.id || !chantierId) return;
+
+    try {
+      console.log(`✅ Marquage paiement ${paiementToUpdate.id} comme réglé`);
+      await unifiedPaiementsService.update(chantierId, paiementToUpdate.id, {
+        statut: 'regle',
+        dateReglement: new Date()
+      });
+      
+      // Recharger TOUTES les données du chantier
+      await reloadData();
+      await loadBudgets();
+      
+      setShowConfirmPaiementModal(false);
+      setPaiementToUpdate(null);
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour:', error);
+      alert('Erreur lors de la mise à jour du paiement');
+    }
+  };
+
   const handleSaveBudget = async (budgetData: Omit<BudgetPrevisionnel, 'id'>) => {
     try {
+      if (!chantierId) {
+        alert('Aucun chantier sélectionné');
+        return;
+      }
+
       console.log('💾 Tentative sauvegarde budget:', budgetData);
       
       if (selectedBudget?.id) {
         console.log('🔄 Mise à jour budget existant:', selectedBudget.id);
-        await budgetService.update(selectedBudget.id, budgetData);
+        await unifiedBudgetService.update(chantierId, selectedBudget.id, budgetData);
       } else {
-        console.log('🆕 Création nouveau budget');
-        await budgetService.create({
+        console.log('🆕 Création nouveau budget dans chantier:', chantierId);
+        await unifiedBudgetService.create(chantierId, {
           ...budgetData,
           dateCreation: new Date(),
           dateModification: new Date()
@@ -91,7 +126,7 @@ export function PaiementsGlobaux() {
       setShowBudgetModal(false);
     } catch (error) {
       console.error('❌ Erreur lors de la sauvegarde budget:', error);
-      alert(`Erreur lors de la sauvegarde: ${error.message || error}`);
+      alert(`Erreur lors de la sauvegarde: ${(error as any).message || error}`);
     }
   };
 
@@ -149,6 +184,13 @@ export function PaiementsGlobaux() {
   }, {} as Record<string, number>);
 
   const budgetActuel = budgets.find(b => b.statut === 'actif');
+
+  // Debug budgets
+  console.log('💰 PaiementsGlobaux - État budgets:', {
+    chantierId: chantierId,
+    totalBudgets: budgets.length,
+    budgetActuel: budgetActuel ? { nom: budgetActuel.nom, montant: budgetActuel.montantActuel } : null
+  });
 
   if (dataLoading) {
     return (
@@ -402,6 +444,7 @@ export function PaiementsGlobaux() {
                   <th className="text-center p-3 text-gray-400 font-medium">Statut</th>
                   <th className="text-left p-3 text-gray-400 font-medium">Date règlement</th>
                   <th className="text-left p-3 text-gray-400 font-medium">Notes</th>
+                  <th className="text-center p-3 text-gray-400 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -459,6 +502,17 @@ export function PaiementsGlobaux() {
                           {paiement.notes || '-'}
                         </div>
                       </td>
+                      <td className="p-3 text-center">
+                        {paiement.statut !== 'regle' && (
+                          <button
+                            onClick={() => handleMarquerRegle(paiement)}
+                            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium transition-colors"
+                            title="Marquer comme réglé"
+                          >
+                            ✓ Réglé
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -481,6 +535,25 @@ export function PaiementsGlobaux() {
           onCancel={() => setShowBudgetModal(false)}
         />
       </Modal>
+
+      {/* Modal de confirmation pour marquer comme réglé */}
+      <ConfirmModal
+        isOpen={showConfirmPaiementModal}
+        onConfirm={confirmMarquerRegle}
+        onCancel={() => {
+          setShowConfirmPaiementModal(false);
+          setPaiementToUpdate(null);
+        }}
+        title="Confirmer le paiement"
+        message={
+          paiementToUpdate
+            ? `Marquer le paiement "${getTypeLabel(paiementToUpdate.type)}" de ${paiementToUpdate.montant.toLocaleString()}€ comme réglé ?\n\nEntreprise : ${paiementToUpdate.entrepriseNom}\n\nCela enregistrera la date de règlement à aujourd'hui.`
+            : ''
+        }
+        confirmText="Confirmer le règlement"
+        cancelText="Annuler"
+        type="success"
+      />
     </div>
   );
 }
