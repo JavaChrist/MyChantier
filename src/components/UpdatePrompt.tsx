@@ -40,7 +40,7 @@ export function UpdatePrompt() {
         if (!navigator.onLine) {
           setIsOnline(false);
           setShowOfflineNotice(true);
-          console.log('📴 Mode hors ligne confirmé');
+          console.warn('📴 Mode hors ligne confirmé');
           setTimeout(() => setShowOfflineNotice(false), 5000);
         }
       }, 2000); // Attendre 2 secondes avant de confirmer

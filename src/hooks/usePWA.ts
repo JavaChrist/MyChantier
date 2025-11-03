@@ -38,7 +38,10 @@ export function usePWA() {
 
     const handleOffline = () => {
       setIsOnline(false);
-      console.log('📴 Mode hors ligne');
+      // Log seulement si vraiment hors ligne (pas au démarrage)
+      if (navigator.onLine === false) {
+        console.warn('📴 Mode hors ligne détecté');
+      }
     };
 
     // Vérifier si l'app est déjà installée

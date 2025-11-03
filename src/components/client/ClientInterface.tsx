@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MessageCircle, Calendar, FileText, CreditCard, LogOut, User, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { MessageCircle, Calendar, FileText, CreditCard, LogOut, User, Clock, CheckCircle, AlertCircle, Menu, X } from 'lucide-react';
 import { useChantierData } from '../../hooks/useChantierData';
 import { ClientChat } from './ClientChat';
 import { ClientEntreprises } from './ClientEntreprises';
@@ -15,33 +15,10 @@ interface ClientInterfaceProps {
 
 export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInterfaceProps) {
   const [currentView, setCurrentView] = useState('overview');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { entreprises, devis, commandes, paiements, loading, reloadData } = useChantierData(chantierId);
 
-  // Debug pour comprendre le problème
-  console.log('🔍 DEBUG CLIENT INTERFACE:', {
-    email: userProfile?.email,
-    role: userProfile?.role,
-    chantierId: chantierId,
-    userChantierId: userProfile?.chantierId,
-    loading: loading,
-    entreprisesCount: entreprises.length,
-    devisCount: devis.length,
-    commandesCount: commandes.length,
-    paiementsCount: paiements.length
-  });
-
-  // Log détaillé des entreprises si aucune
-  if (entreprises.length === 0 && !loading) {
-    console.warn('⚠️ AUCUNE ENTREPRISE CHARGÉE pour le client !');
-    console.warn('ChantierId utilisé:', chantierId);
-  }
-
-  // ALERTE si le client voit des données du chantier principal
-  if (chantierId === 'chantier-principal' && userProfile?.chantierId !== 'chantier-principal') {
-    console.warn('🚨 PROBLÈME: Client voit le chantier principal au lieu de son chantier!');
-    console.warn('Client chantierId:', userProfile?.chantierId);
-    console.warn('Interface chantierId:', chantierId);
-  }
+  // Système de chargement des données via useChantierData
 
   // Calculer les stats pour le client
   const stats = {
@@ -90,38 +67,54 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
     );
   }
 
+  const navItems = [
+    { id: 'overview', label: 'Vue d\'ensemble', icon: FileText },
+    { id: 'chat', label: 'Messages', icon: MessageCircle },
+    { id: 'documents', label: 'Documents', icon: FileText },
+    { id: 'planning', label: 'Planning', icon: Calendar },
+    { id: 'paiements', label: 'Paiements', icon: CreditCard }
+  ];
+
+  const handleNavChange = (viewId: string) => {
+    setCurrentView(viewId);
+    setMobileMenuOpen(false);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header client */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">Mon Chantier</h1>
-              <p className="text-gray-600">{userProfile.displayName}</p>
+            <div className="flex items-center space-x-3">
+              {/* Bouton menu mobile */}
+              <button
+                onClick={() => setMobileMenuOpen(true)}
+                className="lg:hidden p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <div>
+                <h1 className="text-xl md:text-2xl font-bold text-gray-800">Mon Chantier</h1>
+                <p className="text-sm text-gray-600">{userProfile.displayName}</p>
+              </div>
             </div>
             <button
               onClick={onLogout}
-              className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+              className="flex items-center space-x-2 px-3 md:px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <LogOut className="w-4 h-4" />
-              <span>Déconnexion</span>
+              <span className="hidden md:inline">Déconnexion</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* Navigation client */}
-      <nav className="bg-white border-b border-gray-200">
+      {/* Navigation desktop (cachée sur mobile) */}
+      <nav className="hidden lg:block bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex space-x-8">
-            {[
-              { id: 'overview', label: 'Vue d\'ensemble', icon: FileText },
-              { id: 'chat', label: 'Messages', icon: MessageCircle },
-              { id: 'documents', label: 'Documents', icon: FileText },
-              { id: 'planning', label: 'Planning', icon: Calendar },
-              { id: 'paiements', label: 'Paiements', icon: CreditCard }
-            ].map(item => {
+            {navItems.map(item => {
               const Icon = item.icon;
               return (
                 <button
@@ -140,6 +133,64 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
           </div>
         </div>
       </nav>
+
+      {/* Menu mobile overlay */}
+      {mobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 z-50">
+          <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setMobileMenuOpen(false)} />
+          <div className="fixed inset-y-0 left-0 w-80 max-w-full bg-white shadow-xl">
+            <div className="flex flex-col h-full">
+              {/* Header menu mobile */}
+              <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-800">Mon Chantier</h2>
+                  <p className="text-sm text-gray-600">{userProfile.displayName}</p>
+                </div>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Navigation mobile */}
+              <nav className="flex-1 overflow-y-auto p-4">
+                <div className="space-y-2">
+                  {navItems.map(item => {
+                    const Icon = item.icon;
+                    const isActive = currentView === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => handleNavChange(item.id)}
+                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${isActive
+                          ? 'bg-primary-100 text-primary-700 font-medium'
+                          : 'text-gray-700 hover:bg-gray-100'
+                          }`}
+                      >
+                        <Icon className="w-5 h-5" />
+                        <span>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </nav>
+
+              {/* Footer menu mobile */}
+              <div className="p-4 border-t border-gray-200">
+                <button
+                  onClick={onLogout}
+                  className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Déconnexion</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Contenu principal */}
       <main className="max-w-7xl mx-auto px-4 py-6">

@@ -158,22 +158,12 @@ function AuthenticatedApp({
   userProfile: any;
   onLogout: () => void;
 }) {
-  // DEBUG pour comprendre la redirection
-  console.log('🔍 DEBUG AUTHENTICATED:', {
-    role: userProfile?.role,
-    email: userProfile?.email,
-    chantierId: userProfile?.chantierId
-  });
-
-  // Si c'est un client, rediriger vers son chantier spécifique
+  // Redirection selon le rôle
   if (userProfile?.role === 'client') {
-    console.log('👤 REDIRECTION CLIENT:', userProfile.email, 'vers chantier:', userProfile.chantierId);
     return <ClientApp userProfile={userProfile} onLogout={onLogout} />;
   }
 
-  // Si c'est un professionnel, afficher le sélecteur de chantier
-  console.log('🏗️ REDIRECTION PROFESSIONNEL:', userProfile?.email);
-  console.log('🔍 Role détecté:', userProfile?.role, '| Type:', typeof userProfile?.role);
+  // Professionnel - afficher le sélecteur de chantier
   return <ProfessionalApp userProfile={userProfile} onLogout={onLogout} />;
 }
 
@@ -181,14 +171,6 @@ function AuthenticatedApp({
 function ClientApp({ userProfile, onLogout }: { userProfile: any; onLogout: () => void }) {
   // Le client n'a accès qu'à SON chantier spécifique
   const clientChantierId = userProfile?.chantierId;
-
-  // DEBUG pour comprendre le problème
-  console.log('🔍 DEBUG CLIENTAPP:', {
-    userProfile: userProfile,
-    chantierId: userProfile?.chantierId,
-    role: userProfile?.role,
-    email: userProfile?.email
-  });
 
   // Si le client n'a pas de chantier assigné, afficher une erreur
   if (!clientChantierId) {
