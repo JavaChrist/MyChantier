@@ -1,3 +1,4 @@
+import React from 'react';
 
 interface IconProps {
   name: 'logo' | 'dashboard' | 'entreprises' | 'prestations' | 'planning' | 'paiements' | 'documents';
@@ -73,6 +74,8 @@ export function Icon({ name, size = 24, className = '' }: IconProps) {
 
 // Composant pour l'icône principale de l'app
 export function AppIcon({ size = 48, className = '' }: { size?: number; className?: string }) {
+  const [imageError, setImageError] = React.useState(false);
+  
   // Choisir la bonne taille selon le size demandé
   const getIconSize = (requestedSize: number) => {
     if (requestedSize <= 16) return '/logo16.png';
@@ -87,6 +90,31 @@ export function AppIcon({ size = 48, className = '' }: { size?: number; classNam
     return '/logo512.png';
   };
 
+  // SVG Fallback si l'image ne charge pas
+  if (imageError) {
+    return (
+      <svg 
+        width={size} 
+        height={size} 
+        viewBox="0 0 100 100" 
+        className={`inline-block ${className}`}
+        fill="currentColor"
+      >
+        <rect width="100" height="100" fill="#0284c7" rx="15"/>
+        <text 
+          x="50" 
+          y="65" 
+          fontSize="50" 
+          fontWeight="bold" 
+          textAnchor="middle" 
+          fill="white"
+        >
+          SC
+        </text>
+      </svg>
+    );
+  }
+
   return (
     <img
       src={getIconSize(size)}
@@ -96,9 +124,8 @@ export function AppIcon({ size = 48, className = '' }: { size?: number; classNam
       className={`inline-block ${className}`}
       style={{ objectFit: 'contain' }}
       onError={(e) => {
-        console.warn(`⚠️ Logo non disponible (mode hors ligne), utilisation fallback`);
-        // Masquer l'image cassée
-        (e.target as HTMLImageElement).style.display = 'none';
+        console.warn(`⚠️ Logo ${getIconSize(size)} non chargé, utilisation fallback SVG`);
+        setImageError(true);
       }}
       onLoad={() => {
         console.log(`✅ AppIcon taille ${size} chargée`);

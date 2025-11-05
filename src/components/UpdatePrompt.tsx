@@ -35,15 +35,27 @@ export function UpdatePrompt() {
     };
 
     const handleOffline = () => {
-      // Ne pas afficher "hors ligne" immédiatement, Firebase peut fonctionner en cache
-      setTimeout(() => {
-        if (!navigator.onLine) {
+      // Ignorer les faux offline (ouverture DevTools)
+      // Vérifier plusieurs fois avant d'afficher le message
+      let checkCount = 0;
+      const intervalId = setInterval(() => {
+        checkCount++;
+        
+        if (navigator.onLine) {
+          // Retour en ligne, annuler
+          clearInterval(intervalId);
+          return;
+        }
+        
+        if (checkCount >= 5) {
+          // Vraiment hors ligne après 5 vérifications (2.5 secondes)
+          clearInterval(intervalId);
           setIsOnline(false);
           setShowOfflineNotice(true);
           console.warn('📴 Mode hors ligne confirmé');
           setTimeout(() => setShowOfflineNotice(false), 5000);
         }
-      }, 2000); // Attendre 2 secondes avant de confirmer
+      }, 500);
     };
 
     window.addEventListener('online', handleOnline);

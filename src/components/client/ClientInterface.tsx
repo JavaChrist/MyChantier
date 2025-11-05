@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { MessageCircle, Calendar, FileText, CreditCard, LogOut, User, Clock, CheckCircle, AlertCircle, Menu, X } from 'lucide-react';
 import { useChantierData } from '../../hooks/useChantierData';
+import { useUnreadMessages } from '../../hooks/useUnreadMessages';
 import { ClientChat } from './ClientChat';
 import { ClientEntreprises } from './ClientEntreprises';
 import { ClientDocuments } from './ClientDocuments';
@@ -17,6 +18,9 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
   const [currentView, setCurrentView] = useState('overview');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { entreprises, devis, commandes, paiements, loading, reloadData } = useChantierData(chantierId);
+  
+  // Compter les messages non lus
+  const unreadMessagesCount = useUnreadMessages(chantierId, 'client');
 
   // Système de chargement des données via useChantierData
 
@@ -83,8 +87,8 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden max-w-full">
       {/* Header client */}
-      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30 max-w-full">
-        <div className="max-w-7xl mx-auto px-3 md:px-4 py-3 md:py-4">
+      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30 max-w-full" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
+        <div className="max-w-7xl mx-auto px-3 md:px-4 pb-3 md:pb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               {/* Bouton menu mobile */}
@@ -99,13 +103,29 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
                 <p className="text-sm text-gray-600">{userProfile.displayName}</p>
               </div>
             </div>
-            <button
-              onClick={onLogout}
-              className="flex items-center space-x-2 px-3 md:px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="hidden md:inline">Déconnexion</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              {/* Badge messages non lus */}
+              {unreadMessagesCount > 0 && (
+                <button
+                  onClick={() => setCurrentView('chat')}
+                  className="relative p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                  title={`${unreadMessagesCount} nouveau${unreadMessagesCount > 1 ? 'x' : ''} message${unreadMessagesCount > 1 ? 's' : ''}`}
+                >
+                  <MessageCircle className="w-5 h-5" />
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[1.25rem] h-5 px-1 flex items-center justify-center">
+                    {unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}
+                  </span>
+                </button>
+              )}
+              
+              <button
+                onClick={onLogout}
+                className="flex items-center space-x-2 px-3 md:px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden md:inline">Déconnexion</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>

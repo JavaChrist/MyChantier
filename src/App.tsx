@@ -64,7 +64,7 @@ function AppContent({ userProfile, onLogout }: { userProfile: any; onLogout: () 
   return (
     <div className="min-h-screen bg-gray-900 overflow-x-hidden max-w-full">
       {/* Header chantier */}
-      <ChantierHeader />
+      <ChantierHeader userProfile={userProfile} onLogout={onLogout} onNavigate={setCurrentView} />
 
       {/* Navigation mobile */}
       <MobileNavigation

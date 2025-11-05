@@ -15,15 +15,28 @@ export function ChantierChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [showValidationModal, setShowValidationModal] = useState(false);
+  const [chatVisible, setChatVisible] = useState(false);
 
   // Charger les messages du chantier actuel
   useEffect(() => {
     if (chantierActuel) {
-      loadMessagesForChantier(chantierActuel.id!);
+      loadMessagesForChantier(chantierActuel.id!, false); // Ne pas marquer comme lu au chargement
+      setChatVisible(true); // Le chat est maintenant visible
     }
   }, [chantierActuel]);
+  
+  // Marquer comme lus après un court délai quand le chat devient visible
+  useEffect(() => {
+    if (chatVisible && chantierActuel) {
+      const timer = setTimeout(() => {
+        markMessagesAsRead(chantierActuel.id!);
+      }, 1000); // Attendre 1 seconde avant de marquer comme lu
+      
+      return () => clearTimeout(timer);
+    }
+  }, [chatVisible, chantierActuel]);
 
-  const loadMessagesForChantier = async (chantierId: string) => {
+  const loadMessagesForChantier = async (chantierId: string, shouldMarkAsRead: boolean = false) => {
     try {
       console.log(`🔍 Chargement messages Firebase V2 pour ${chantierId}`);
 
@@ -36,10 +49,38 @@ export function ChantierChat() {
       if (messagesData.length === 0) {
         console.log('🔄 Création des messages de bienvenue...');
         await createWelcomeMessages(chantierId);
+      } else if (shouldMarkAsRead) {
+        // Marquer comme lus seulement si demandé explicitement
+        await markMessagesAsRead(chantierId);
       }
     } catch (error) {
       console.error('Erreur chargement messages:', error);
       setMessages([]);
+    }
+  };
+  
+  const markMessagesAsRead = async (chantierId: string) => {
+    try {
+      const messagesData = await unifiedMessagesService.getByChantier(chantierId);
+      const currentUserType = isClientInterface ? 'client' : 'professional';
+      const unreadMessages = messagesData.filter(msg => 
+        !msg.isRead && msg.sender !== currentUserType
+      );
+      
+      if (unreadMessages.length > 0) {
+        const messageIds = unreadMessages.map(msg => msg.id!).filter(id => id);
+        await unifiedMessagesService.markAsRead(chantierId, messageIds);
+        console.log(`✅ ${messageIds.length} messages marqués comme lus`);
+        
+        // Recharger pour mettre à jour l'affichage
+        const updatedMessages = await unifiedMessagesService.getByChantier(chantierId);
+        setMessages(updatedMessages);
+        
+        // Notifier pour mettre à jour le badge
+        window.dispatchEvent(new Event('messages-updated'));
+      }
+    } catch (error) {
+      console.error('Erreur marquage messages comme lus:', error);
     }
   };
 
@@ -89,8 +130,11 @@ export function ChantierChat() {
 
       setNewMessage('');
 
-      // Recharger les messages
-      await loadMessagesForChantier(chantierActuel.id!);
+      // Recharger les messages (sans marquer comme lu, c'est notre propre message)
+      await loadMessagesForChantier(chantierActuel.id!, false);
+      
+      // Notifier les autres composants pour mettre à jour le badge
+      window.dispatchEvent(new Event('messages-updated'));
     } catch (error) {
       console.error('Erreur envoi message:', error);
     }

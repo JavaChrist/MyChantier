@@ -5,12 +5,25 @@ import { unifiedMessagesService, type Message } from '../../firebase/unified-ser
 export function ClientChat({ chantierId, userProfile }: { chantierId: string; userProfile: any }) {
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [chatVisible, setChatVisible] = useState(false);
 
   useEffect(() => {
-    loadMessagesForChantier(chantierId);
+    loadMessagesForChantier(chantierId, false); // Ne pas marquer comme lu immédiatement
+    setChatVisible(true);
   }, [chantierId]);
+  
+  // Marquer comme lus après un délai
+  useEffect(() => {
+    if (chatVisible && chantierId) {
+      const timer = setTimeout(() => {
+        markMessagesAsRead(chantierId);
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [chatVisible, chantierId]);
 
-  const loadMessagesForChantier = async (chantierId: string) => {
+  const loadMessagesForChantier = async (chantierId: string, shouldMarkAsRead: boolean = false) => {
     try {
       console.log(`🔍 Client: Chargement messages Firebase V2 pour ${chantierId}`);
 
@@ -18,9 +31,37 @@ export function ClientChat({ chantierId, userProfile }: { chantierId: string; us
       setMessages(messagesData);
 
       console.log(`✅ Client: ${messagesData.length} messages chargés depuis Firebase V2`);
+      
+      if (shouldMarkAsRead) {
+        await markMessagesAsRead(chantierId);
+      }
     } catch (error) {
       console.error('Erreur chargement messages:', error);
       setMessages([]);
+    }
+  };
+  
+  const markMessagesAsRead = async (chantierId: string) => {
+    try {
+      const messagesData = await unifiedMessagesService.getByChantier(chantierId);
+      const unreadMessages = messagesData.filter(msg => 
+        !msg.isRead && msg.sender === 'professional'
+      );
+      
+      if (unreadMessages.length > 0) {
+        const messageIds = unreadMessages.map(msg => msg.id!).filter(id => id);
+        await unifiedMessagesService.markAsRead(chantierId, messageIds);
+        console.log(`✅ Client: ${messageIds.length} messages marqués comme lus`);
+        
+        // Recharger pour mettre à jour l'affichage
+        const updatedMessages = await unifiedMessagesService.getByChantier(chantierId);
+        setMessages(updatedMessages);
+        
+        // Notifier pour mettre à jour le badge
+        window.dispatchEvent(new Event('messages-updated'));
+      }
+    } catch (error) {
+      console.error('Erreur marquage messages comme lus:', error);
     }
   };
 
@@ -43,7 +84,10 @@ export function ClientChat({ chantierId, userProfile }: { chantierId: string; us
       setNewMessage('');
 
       // Recharger les messages
-      await loadMessagesForChantier(chantierId);
+      await loadMessagesForChantier(chantierId, false);
+      
+      // Notifier les autres composants pour mettre à jour le badge
+      window.dispatchEvent(new Event('messages-updated'));
     } catch (error) {
       console.error('Erreur envoi message client:', error);
     }
