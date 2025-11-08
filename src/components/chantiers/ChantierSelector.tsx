@@ -623,7 +623,7 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <div className="min-h-screen bg-gray-50 px-4 pb-4 pt-16 md:pt-8" style={{ paddingTop: 'max(4rem, calc(env(safe-area-inset-top) + 2rem))' }}>
       <div className="max-w-4xl mx-auto">
         {/* En-tête */}
         <div className="text-center mb-8 relative">
