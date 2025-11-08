@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { Trash2 } from 'lucide-react';
 import { unifiedMessagesService, type Message } from '../../firebase/unified-services';
+import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { db } from '../../firebase/config';
+import { ConfirmModal } from '../ConfirmModal';
 
 // Composant de chat adapté pour les clients
 export function ClientChat({ chantierId, userProfile }: { chantierId: string; userProfile: any }) {
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [chatVisible, setChatVisible] = useState(false);
+  const [showPurgeConfirm, setShowPurgeConfirm] = useState(false);
 
   useEffect(() => {
     loadMessagesForChantier(chantierId, false); // Ne pas marquer comme lu immédiatement
@@ -102,12 +107,54 @@ export function ClientChat({ chantierId, userProfile }: { chantierId: string; us
     return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   };
 
+  const handlePurgeMessages = async () => {
+    setShowPurgeConfirm(false);
+
+    try {
+      console.log(`🗑️ Client: Purge de tous les messages du chantier ${chantierId}`);
+      
+      const messagesSnapshot = await getDocs(collection(db, `chantiers/${chantierId}/messages`));
+      console.log(`📦 ${messagesSnapshot.size} messages à supprimer`);
+
+      let count = 0;
+      for (const messageDoc of messagesSnapshot.docs) {
+        await deleteDoc(doc(db, `chantiers/${chantierId}/messages`, messageDoc.id));
+        count++;
+      }
+
+      console.log(`✅ ${count} messages supprimés`);
+      
+      // Recharger
+      await loadMessagesForChantier(chantierId, false);
+      
+      // Notifier
+      window.dispatchEvent(new Event('messages-updated'));
+      
+    } catch (error) {
+      console.error('❌ Erreur purge messages:', error);
+    }
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       {/* En-tête */}
       <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 border-b border-blue-300">
-        <h3 className="text-lg font-semibold text-white">Messages avec votre professionnel</h3>
-        <p className="text-sm text-blue-100">Communication pour votre chantier</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-white">Messages avec votre professionnel</h3>
+            <p className="text-sm text-blue-100">Communication pour votre chantier</p>
+          </div>
+          {messages.length > 0 && (
+            <button
+              onClick={() => setShowPurgeConfirm(true)}
+              className="px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm flex items-center space-x-2 transition-colors"
+              title="Purger tous les messages"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span className="hidden md:inline">Purger</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Zone de messages */}
@@ -163,6 +210,18 @@ export function ClientChat({ chantierId, userProfile }: { chantierId: string; us
           </button>
         </div>
       </div>
+      
+      {/* Modal de confirmation de purge */}
+      <ConfirmModal
+        isOpen={showPurgeConfirm}
+        onConfirm={handlePurgeMessages}
+        onCancel={() => setShowPurgeConfirm(false)}
+        title="Purger tous les messages"
+        message={`Voulez-vous vraiment supprimer TOUS les messages de cette conversation ?\n\nCette action est irréversible et supprimera ${messages.length} message(s).`}
+        confirmText="Purger"
+        cancelText="Annuler"
+        type="danger"
+      />
     </div>
   );
 }

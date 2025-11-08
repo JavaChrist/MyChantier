@@ -18,6 +18,8 @@ export interface Chantier {
   description: string;
   clientNom: string;
   clientEmail: string;
+  clientEmail2?: string; // Email supplémentaire optionnel
+  clientEmail3?: string; // Email supplémentaire optionnel
   clientTelephone?: string;
   adresse: string;
   dateDebut: Date;

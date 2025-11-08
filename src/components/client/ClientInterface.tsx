@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MessageCircle, Calendar, FileText, CreditCard, LogOut, User, Clock, CheckCircle, AlertCircle, Menu, X } from 'lucide-react';
 import { useChantierData } from '../../hooks/useChantierData';
 import { useUnreadMessages } from '../../hooks/useUnreadMessages';
@@ -17,10 +17,28 @@ interface ClientInterfaceProps {
 export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInterfaceProps) {
   const [currentView, setCurrentView] = useState('overview');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [chantierNom, setChantierNom] = useState('Mon Chantier');
   const { entreprises, devis, commandes, paiements, loading, reloadData } = useChantierData(chantierId);
   
   // Compter les messages non lus
   const unreadMessagesCount = useUnreadMessages(chantierId, 'client');
+  
+  // Charger le nom du chantier
+  useEffect(() => {
+    const loadChantierNom = async () => {
+      try {
+        const { doc, getDoc } = await import('firebase/firestore');
+        const { db } = await import('../../firebase/config');
+        const chantierDoc = await getDoc(doc(db, 'chantiers', chantierId));
+        if (chantierDoc.exists()) {
+          setChantierNom(chantierDoc.data().nom || 'Mon Chantier');
+        }
+      } catch (error) {
+        console.error('Erreur chargement nom chantier:', error);
+      }
+    };
+    loadChantierNom();
+  }, [chantierId]);
 
   // Système de chargement des données via useChantierData
 
@@ -99,7 +117,7 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
                 <Menu className="w-5 h-5" />
               </button>
               <div>
-                <h1 className="text-xl md:text-2xl font-bold text-gray-800">Mon Chantier</h1>
+                <h1 className="text-xl md:text-2xl font-bold text-gray-800">{chantierNom}</h1>
                 <p className="text-sm text-gray-600">{userProfile.displayName}</p>
               </div>
             </div>

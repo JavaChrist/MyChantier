@@ -21,7 +21,7 @@ const COULEURS_SECTEURS = {
 
 export function EntreprisesManager() {
   const { chantierId, chantierActuel } = useChantier();
-  const { entreprises, loading, reloadData } = useChantierData(chantierId);
+  const { entreprises, devis, commandes, paiements, loading, reloadData } = useChantierData(chantierId);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSecteur, setSelectedSecteur] = useState<string>('all');
@@ -30,6 +30,15 @@ export function EntreprisesManager() {
   const [showDevis, setShowDevis] = useState<string | null>(null);
   const [showCommandes, setShowCommandes] = useState<string | null>(null);
   const [showPaiements, setShowPaiements] = useState<string | null>(null);
+  
+  // Fonction pour compter les éléments par entreprise
+  const getEntrepriseStats = (entrepriseId: string) => {
+    return {
+      devisCount: devis.filter(d => d.entrepriseId === entrepriseId).length,
+      commandesCount: commandes.filter(c => c.entrepriseId === entrepriseId).length,
+      paiementsCount: paiements.filter(p => p.entrepriseId === entrepriseId).length
+    };
+  };
 
   const secteurs = [
     { value: 'all', label: 'Tous les secteurs' },
@@ -275,30 +284,60 @@ export function EntreprisesManager() {
                       e.stopPropagation();
                       setShowDevis(entreprise.id || null);
                     }}
-                    className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded text-xs text-white transition-colors"
+                    className="flex-1 flex flex-col items-center justify-center px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded text-xs text-white transition-colors relative"
                   >
-                    <FileText className="w-3 h-3" />
-                    <span>Devis</span>
+                    <div className="flex items-center space-x-1">
+                      <FileText className="w-3 h-3" />
+                      <span>Devis</span>
+                    </div>
+                    {(() => {
+                      const stats = getEntrepriseStats(entreprise.id || '');
+                      return stats.devisCount > 0 ? (
+                        <span className="absolute -top-1 -right-1 bg-blue-400 text-blue-900 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                          {stats.devisCount}
+                        </span>
+                      ) : null;
+                    })()}
                   </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       setShowCommandes(entreprise.id || null);
                     }}
-                    className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 bg-green-600 hover:bg-green-700 rounded text-xs text-white transition-colors"
+                    className="flex-1 flex flex-col items-center justify-center px-3 py-2 bg-green-600 hover:bg-green-700 rounded text-xs text-white transition-colors relative"
                   >
-                    <ShoppingCart className="w-3 h-3" />
-                    <span>Commandes</span>
+                    <div className="flex items-center space-x-1">
+                      <ShoppingCart className="w-3 h-3" />
+                      <span>Commandes</span>
+                    </div>
+                    {(() => {
+                      const stats = getEntrepriseStats(entreprise.id || '');
+                      return stats.commandesCount > 0 ? (
+                        <span className="absolute -top-1 -right-1 bg-green-400 text-green-900 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                          {stats.commandesCount}
+                        </span>
+                      ) : null;
+                    })()}
                   </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       setShowPaiements(entreprise.id || null);
                     }}
-                    className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 bg-yellow-600 hover:bg-yellow-700 rounded text-xs text-white transition-colors"
+                    className="flex-1 flex flex-col items-center justify-center px-3 py-2 bg-yellow-600 hover:bg-yellow-700 rounded text-xs text-white transition-colors relative"
                   >
-                    <CreditCard className="w-3 h-3" />
-                    <span>Paiements</span>
+                    <div className="flex items-center space-x-1">
+                      <CreditCard className="w-3 h-3" />
+                      <span>Paiements</span>
+                    </div>
+                    {(() => {
+                      const stats = getEntrepriseStats(entreprise.id || '');
+                      return stats.paiementsCount > 0 ? (
+                        <span className="absolute -top-1 -right-1 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                          {stats.paiementsCount}
+                        </span>
+                      ) : null;
+                    })()}
                   </button>
                 </div>
               </div>

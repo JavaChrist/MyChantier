@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Send, MessageCircle, User, Clock, FileText, AlertCircle, CheckCircle } from 'lucide-react';
+import { Send, MessageCircle, User, Clock, FileText, AlertCircle, CheckCircle, Trash2 } from 'lucide-react';
 import { useChantier } from '../../contexts/ChantierContext';
 import { unifiedMessagesService, type Message } from '../../firebase/unified-services';
+import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { db } from '../../firebase/config';
+import { ConfirmModal } from '../ConfirmModal';
 
 
 export function ChantierChat() {
@@ -16,6 +19,7 @@ export function ChantierChat() {
   const [newMessage, setNewMessage] = useState('');
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [chatVisible, setChatVisible] = useState(false);
+  const [showPurgeConfirm, setShowPurgeConfirm] = useState(false);
 
   // Charger les messages du chantier actuel
   useEffect(() => {
@@ -180,6 +184,35 @@ export function ChantierChat() {
     return date.toDateString() === today.toDateString();
   };
 
+  const handlePurgeMessages = async () => {
+    if (!chantierActuel) return;
+    setShowPurgeConfirm(false);
+
+    try {
+      console.log(`🗑️ Purge de tous les messages du chantier ${chantierActuel.id}`);
+      
+      const messagesSnapshot = await getDocs(collection(db, `chantiers/${chantierActuel.id}/messages`));
+      console.log(`📦 ${messagesSnapshot.size} messages à supprimer`);
+
+      let count = 0;
+      for (const messageDoc of messagesSnapshot.docs) {
+        await deleteDoc(doc(db, `chantiers/${chantierActuel.id}/messages`, messageDoc.id));
+        count++;
+      }
+
+      console.log(`✅ ${count} messages supprimés`);
+      
+      // Recharger les messages (vide)
+      await loadMessagesForChantier(chantierActuel.id, false);
+      
+      // Notifier
+      window.dispatchEvent(new Event('messages-updated'));
+      
+    } catch (error) {
+      console.error('❌ Erreur purge messages:', error);
+    }
+  };
+
   if (!chantierActuel) {
     return (
       <div className="text-center py-8">
@@ -204,13 +237,25 @@ export function ChantierChat() {
             Communication avec {chantierActuel.clientNom} - {chantierActuel.nom}
           </p>
         </div>
-        <button
-          onClick={() => setShowValidationModal(true)}
-          className="btn-primary text-sm flex items-center space-x-2"
-        >
-          <AlertCircle className="w-4 h-4" />
-          <span>Demander validation</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setShowValidationModal(true)}
+            className="btn-primary text-sm flex items-center space-x-2"
+          >
+            <AlertCircle className="w-4 h-4" />
+            <span className="hidden md:inline">Demander validation</span>
+          </button>
+          {messages.length > 0 && (
+            <button
+              onClick={() => setShowPurgeConfirm(true)}
+              className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm flex items-center space-x-2 transition-colors"
+              title="Purger tous les messages"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span className="hidden md:inline">Purger</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* En-tête conversation */}
@@ -319,6 +364,18 @@ export function ChantierChat() {
           <p>• <strong>Paiements</strong> : Échéances, factures, acomptes</p>
         </div>
       </div>
+      
+      {/* Modal de confirmation de purge */}
+      <ConfirmModal
+        isOpen={showPurgeConfirm}
+        onConfirm={handlePurgeMessages}
+        onCancel={() => setShowPurgeConfirm(false)}
+        title="Purger tous les messages"
+        message={`Voulez-vous vraiment supprimer TOUS les messages de cette conversation ?\n\nCette action est irréversible et supprimera ${messages.length} message(s).`}
+        confirmText="Purger"
+        cancelText="Annuler"
+        type="danger"
+      />
     </div>
   );
 }

@@ -78,9 +78,15 @@ export function DevisManager({ entrepriseId, entrepriseName, chantierId }: Devis
 
       // Charger TOUS les devis du chantier puis filtrer par entreprise
       const allDevis = await unifiedDevisService.getByChantier(chantierId);
-      const data = allDevis.filter(d => d.entrepriseId === entrepriseId);
+      console.log(`📦 TOUS LES DEVIS du chantier:`, allDevis.length, allDevis);
+      console.log(`🔎 Filtrage pour entrepriseId: "${entrepriseId}"`);
+      
+      const data = allDevis.filter(d => {
+        console.log(`  - Devis ${d.numero}: entrepriseId="${d.entrepriseId}" ${d.entrepriseId === entrepriseId ? '✅ MATCH' : '❌ NO MATCH'}`);
+        return d.entrepriseId === entrepriseId;
+      });
 
-      console.log(`✅ ${data.length} devis chargés pour cette entreprise`);
+      console.log(`✅ ${data.length} devis chargés pour cette entreprise (${entrepriseName})`);
       setDevis(data);
     } catch (error) {
       console.error('Erreur lors du chargement des devis:', error);

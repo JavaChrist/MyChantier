@@ -233,13 +233,22 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
         console.log('✅ Informations client préparées (pas de déconnexion)');
 
         // Message avec instructions pour le professionnel
+        let emailsMessage = `Email principal: ${chantierData.clientEmail}`;
+        if (chantierData.clientEmail2 && chantierData.clientEmail2.trim()) {
+          emailsMessage += `\nEmail secondaire: ${chantierData.clientEmail2}`;
+        }
+        if (chantierData.clientEmail3 && chantierData.clientEmail3.trim()) {
+          emailsMessage += `\nEmail tertiaire: ${chantierData.clientEmail3}`;
+        }
+        
         setSuccessMessage(
           `Chantier "${chantierData.nom}" créé avec succès !\n\n` +
-          `👤 Client: ${chantierData.clientNom} (${chantierData.clientEmail})\n\n` +
-          `📧 Instructions à transmettre au client :\n\n` +
+          `👤 Client: ${chantierData.clientNom}\n\n` +
+          `📧 Emails d'accès:\n${emailsMessage}\n\n` +
+          `📧 Instructions à transmettre au(x) client(s) :\n\n` +
           `1. Aller sur votre application de suivi de chantier\n` +
           `2. Cliquer sur "S'inscrire"\n` +
-          `3. Utiliser son email: ${chantierData.clientEmail}\n` +
+          `3. Utiliser un des emails ci-dessus\n` +
           `4. Choisir un mot de passe\n` +
           `5. Il sera automatiquement associé à ce chantier\n\n` +
           `✅ Vous restez connecté et pouvez continuer à travailler !`
@@ -274,7 +283,7 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
 
         console.log('✅ Dates validées:', { dateDebut, dateFinPrevue });
 
-        const chantierDataForFirebase = {
+        const chantierDataForFirebase: any = {
           nom: chantierData.nom,
           description: chantierData.description,
           clientNom: chantierData.clientNom,
@@ -289,6 +298,14 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
           dateCreation: Timestamp.fromDate(new Date()),
           dateModification: Timestamp.fromDate(new Date())
         };
+        
+        // Ajouter les emails supplémentaires s'ils existent
+        if (chantierData.clientEmail2 && chantierData.clientEmail2.trim()) {
+          chantierDataForFirebase.clientEmail2 = chantierData.clientEmail2.trim();
+        }
+        if (chantierData.clientEmail3 && chantierData.clientEmail3.trim()) {
+          chantierDataForFirebase.clientEmail3 = chantierData.clientEmail3.trim();
+        }
 
         console.log('📦 Données à sauvegarder:', chantierDataForFirebase);
 
@@ -504,7 +521,7 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
       const { doc, setDoc, Timestamp } = await import('firebase/firestore');
       const { db } = await import('../../firebase/config');
 
-      const chantierDataForFirebase = {
+      const chantierDataForFirebase: any = {
         nom: chantierData.nom,
         description: chantierData.description,
         clientNom: chantierData.clientNom,
@@ -519,6 +536,20 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
         dateCreation: Timestamp.fromDate(selectedChantier.dateCreation),
         dateModification: Timestamp.fromDate(new Date())
       };
+      
+      // Ajouter les emails supplémentaires s'ils existent
+      if (chantierData.clientEmail2 && chantierData.clientEmail2.trim()) {
+        chantierDataForFirebase.clientEmail2 = chantierData.clientEmail2.trim();
+      }
+      if (chantierData.clientEmail3 && chantierData.clientEmail3.trim()) {
+        chantierDataForFirebase.clientEmail3 = chantierData.clientEmail3.trim();
+      }
+      
+      console.log('📦 Données de mise à jour avec emails:', {
+        clientEmail: chantierDataForFirebase.clientEmail,
+        clientEmail2: chantierDataForFirebase.clientEmail2,
+        clientEmail3: chantierDataForFirebase.clientEmail3
+      });
 
       // Mettre à jour le document parent
       await setDoc(doc(db, 'chantiers', selectedChantier.id!), chantierDataForFirebase);
@@ -530,7 +561,11 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
       setShowEditChantierModal(false);
       setSelectedChantier(null);
 
-      setSuccessMessage(`Chantier "${chantierData.nom}" modifié avec succès !`);
+      const emailsInfo = chantierData.clientEmail2 || chantierData.clientEmail3
+        ? `\n\nEmails d'accès:\n- ${chantierData.clientEmail}${chantierData.clientEmail2 ? `\n- ${chantierData.clientEmail2}` : ''}${chantierData.clientEmail3 ? `\n- ${chantierData.clientEmail3}` : ''}`
+        : '';
+
+      setSuccessMessage(`✅ Chantier "${chantierData.nom}" modifié avec succès !${emailsInfo}`);
       setShowSuccessModal(true);
 
     } catch (error) {
@@ -844,6 +879,8 @@ function NewChantierForm({
     description: '',
     clientNom: '',
     clientEmail: '',
+    clientEmail2: '',
+    clientEmail3: '',
     clientTelephone: '',
     adresse: '',
     dateDebut: '',
@@ -860,6 +897,8 @@ function NewChantierForm({
         description: chantier.description,
         clientNom: chantier.clientNom,
         clientEmail: chantier.clientEmail,
+        clientEmail2: chantier.clientEmail2 || '',
+        clientEmail3: chantier.clientEmail3 || '',
         clientTelephone: chantier.clientTelephone || '',
         adresse: chantier.adresse,
         dateDebut: chantier.dateDebut.toISOString().split('T')[0],
@@ -910,6 +949,8 @@ function NewChantierForm({
       description: formData.description,
       clientNom: formData.clientNom,
       clientEmail: formData.clientEmail,
+      clientEmail2: formData.clientEmail2 || undefined,
+      clientEmail3: formData.clientEmail3 || undefined,
       clientTelephone: formData.clientTelephone,
       adresse: formData.adresse,
       dateDebut: dateDebut,
@@ -969,23 +1010,23 @@ function NewChantierForm({
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Nom du client
-          </label>
-          <input
-            type="text"
-            value={formData.clientNom}
-            onChange={(e) => setFormData(prev => ({ ...prev, clientNom: e.target.value }))}
-            className="input-field w-full"
-            placeholder="Ex: M. et Mme Dupont"
-          />
-        </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Nom du client
+        </label>
+        <input
+          type="text"
+          value={formData.clientNom}
+          onChange={(e) => setFormData(prev => ({ ...prev, clientNom: e.target.value }))}
+          className="input-field w-full"
+          placeholder="Ex: M. et Mme Dupont"
+        />
+      </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
-            Email du client *
+            Email du client principal *
           </label>
           <input
             type="email"
@@ -996,7 +1037,39 @@ function NewChantierForm({
             placeholder="client@exemple.com"
           />
           <p className="text-xs text-blue-400 mt-1">
-            💡 Un compte client sera automatiquement créé avec cet email
+            💡 Un compte client sera créé avec cet email
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            Email secondaire (facultatif)
+          </label>
+          <input
+            type="email"
+            value={formData.clientEmail2}
+            onChange={(e) => setFormData(prev => ({ ...prev, clientEmail2: e.target.value }))}
+            className="input-field w-full"
+            placeholder="conjoint@exemple.com"
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Accès au même chantier
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            Email tertiaire (facultatif)
+          </label>
+          <input
+            type="email"
+            value={formData.clientEmail3}
+            onChange={(e) => setFormData(prev => ({ ...prev, clientEmail3: e.target.value }))}
+            className="input-field w-full"
+            placeholder="autre@exemple.com"
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Accès au même chantier
           </p>
         </div>
       </div>

@@ -18,6 +18,12 @@ import { ChantierHeader } from './components/chantiers/ChantierHeader';
 import { LoginForm } from './components/auth/LoginForm';
 import { useAuth } from './hooks/useAuth';
 import { ClientInterface } from './components/client/ClientInterface';
+// Importer les outils de diagnostic et nettoyage
+import './utils/migrateDevisToV2';
+import './utils/fixDevisEntreprises';
+import './utils/cleanupDevis';
+import './utils/cleanupEtapes';
+import './utils/addSecondaryEmail';
 
 function AppContent({ userProfile, onLogout }: { userProfile: any; onLogout: () => void }) {
   const [currentView, setCurrentView] = useState('dashboard');

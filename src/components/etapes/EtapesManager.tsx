@@ -37,11 +37,8 @@ export function EtapesManager() {
 
       console.log(`✅ ${etapesData.length} étapes chargées depuis Firebase V2`);
 
-      // Si aucune étape, créer les étapes par défaut
-      if (etapesData.length === 0) {
-        console.log('🔄 Création des étapes par défaut...');
-        await createDefaultEtapes();
-      }
+      // Ne plus créer d'étapes par défaut automatiquement
+      // L'utilisateur créera ses propres étapes selon ses besoins
     } catch (error) {
       console.error('Erreur chargement étapes:', error);
     } finally {

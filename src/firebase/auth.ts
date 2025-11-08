@@ -7,8 +7,43 @@ import {
   sendPasswordResetEmail,
   type User
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, getDocs, query } from 'firebase/firestore';
 import { auth, db } from './config';
+
+// Fonction pour trouver un chantier par email (principal, secondaire ou tertiaire)
+async function trouverChantierParEmail(email: string): Promise<string | null> {
+  try {
+    console.log(`🔎 Recherche chantier pour email: "${email}"`);
+    const chantiersSnapshot = await getDocs(collection(db, 'chantiers'));
+    console.log(`📦 ${chantiersSnapshot.size} chantiers trouvés`);
+    
+    for (const chantierDoc of chantiersSnapshot.docs) {
+      const data = chantierDoc.data();
+      const emailLower = email.toLowerCase().trim();
+      
+      console.log(`  - Chantier "${data.nom}":`, {
+        clientEmail: data.clientEmail,
+        clientEmail2: data.clientEmail2,
+        clientEmail3: data.clientEmail3
+      });
+      
+      if (
+        data.clientEmail?.toLowerCase().trim() === emailLower ||
+        data.clientEmail2?.toLowerCase().trim() === emailLower ||
+        data.clientEmail3?.toLowerCase().trim() === emailLower
+      ) {
+        console.log(`✅ Chantier "${data.nom}" trouvé pour email: ${email}`);
+        return chantierDoc.id;
+      }
+    }
+    
+    console.log(`❌ Aucun chantier trouvé pour email: ${email}`);
+    return null;
+  } catch (error) {
+    console.error('Erreur recherche chantier par email:', error);
+    return null;
+  }
+}
 
 export interface UserProfile {
   uid: string;
@@ -45,12 +80,32 @@ export const authService = {
       // Mettre à jour le profil
       await updateProfile(userCredential.user, { displayName });
 
+      // Détecter si c'est un email client (chercher dans les chantiers)
+      console.log('🔍 Vérification si email client:', email);
+      const chantierTrouve = await trouverChantierParEmail(email);
+      
+      let role: 'professional' | 'client' = 'professional';
+      let chantierId: string | undefined = undefined;
+      
+      if (chantierTrouve) {
+        // C'est un email de client (principal, secondaire ou tertiaire)
+        console.log(`✅ Email trouvé dans chantier: ${chantierTrouve}`);
+        role = 'client';
+        chantierId = chantierTrouve;
+      } else {
+        // Email non trouvé dans les chantiers → Professionnel
+        console.log('ℹ️ Email non trouvé dans les chantiers → Professionnel');
+      }
+
       // Créer le profil utilisateur dans Firestore
       await authService.createUserProfile(userCredential.user.uid, {
         email,
         displayName,
-        role: 'professional' // Par défaut, les nouveaux utilisateurs sont 'professional'
+        role,
+        chantierId
       });
+
+      console.log(`✅ Compte créé: ${email} → ${role}${chantierId ? ` (chantier: ${chantierId})` : ''}`);
 
       return userCredential.user;
     } catch (error: any) {
@@ -166,10 +221,19 @@ export const authService = {
 
         // Pour les clients, le chantierId doit être assigné par le professionnel
         let chantierId = data.chantierId;
-        if (userRole === 'client' && !chantierId) {
-          console.warn('⚠️ Client sans chantierId assigné - doit être configuré par le professionnel');
-          // Ne pas assigner automatiquement un chantier par défaut
-          // Le client verra un message lui demandant de contacter le professionnel
+        if (userRole === 'client' && !chantierId && user?.email) {
+          // Chercher si cet email est un email secondaire/tertiaire d'un chantier
+          console.log('🔍 Recherche chantier pour email secondaire:', user.email);
+          const chantierTrouve = await trouverChantierParEmail(user.email);
+          
+          if (chantierTrouve) {
+            console.log(`✅ Chantier trouvé pour email secondaire: ${chantierTrouve}`);
+            chantierId = chantierTrouve;
+            // Sauvegarder l'assignation
+            await setDoc(doc(db, 'users', uid), { chantierId: chantierTrouve }, { merge: true });
+          } else {
+            console.warn('⚠️ Client sans chantierId assigné - doit être configuré par le professionnel');
+          }
         }
 
         // Utiliser l'email de Firebase Auth si celui de Firestore est vide
