@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Calendar, MapPin, Users, ArrowRight, Edit2, LogOut, Trash2 } from 'lucide-react';
+import { Plus, Calendar, MapPin, Users, ArrowRight, Edit2, LogOut, Trash2, Mail } from 'lucide-react';
 import { AppIcon } from '../Icon';
 import type { Chantier } from '../../firebase/chantiers';
 import { useChantier } from '../../contexts/ChantierContext';
@@ -28,21 +28,39 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
   const getChantierPrincipal = async (): Promise<Chantier> => {
     try {
       // Essayer de charger depuis Firebase V2
-      const { getDocs, collection } = await import('firebase/firestore');
+      const { getDocs, getDoc, collection, doc } = await import('firebase/firestore');
       const { db } = await import('../../firebase/config');
 
+      // Charger le document parent (contient les emails à jour)
+      const parentDoc = await getDoc(doc(db, 'chantiers', 'chantier-grohens-pitet'));
+      const parentData = parentDoc.exists() ? parentDoc.data() : null;
+
+      // Charger aussi la sous-collection info (pour compatibilité)
       const infoSnapshot = await getDocs(collection(db, 'chantiers/chantier-grohens-pitet/info'));
+      const infoData = infoSnapshot.docs.length > 0 ? infoSnapshot.docs[0].data() : null;
 
-      if (infoSnapshot.docs.length > 0) {
-        const data = infoSnapshot.docs[0].data();
-        console.log('✅ Chantier Grohens-Pitet chargé depuis Firebase V2');
+      // Fusionner (priorité au parent qui est plus à jour)
+      const data = {
+        ...infoData,
+        ...parentData
+      };
 
+      console.log('✅ Chantier Grohens-Pitet chargé depuis Firebase V2');
+      console.log('📧 Emails Grohens:', {
+        email1: data.clientEmail,
+        email2: data.clientEmail2,
+        email3: data.clientEmail3
+      });
+
+      if (data.nom) {
         return {
           id: 'chantier-grohens-pitet',
           nom: data.nom || '🏠 Rénovation ancien chemin du halage',
           description: data.description || 'Rénovation complète',
           clientNom: data.clientNom || 'Grohens Pitet',
           clientEmail: data.clientEmail || 'coralie.grohens@gmail.com',
+          clientEmail2: data.clientEmail2 || undefined,
+          clientEmail3: data.clientEmail3 || undefined,
           clientTelephone: data.clientTelephone || '',
           adresse: data.adresse || '27 ancien chemin du halage 31170 Tournefeuille',
           dateDebut: data.dateDebut?.toDate() || new Date('2025-01-10'),
@@ -104,17 +122,29 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
         try {
           console.log(`📋 Chargement chantier: ${chantierId}`);
 
-          // Charger les infos depuis la sous-collection "info"
+          // Charger à la fois le document parent et la sous-collection info
+          const parentData = chantierDoc.data();
           const infoSnapshot = await getDocs(collection(db, `chantiers/${chantierId}/info`));
+          const infoData = infoSnapshot.docs.length > 0 ? infoSnapshot.docs[0].data() : null;
 
-          if (infoSnapshot.docs.length > 0) {
-            const data = infoSnapshot.docs[0].data();
+          // Fusionner (priorité au parent pour les emails)
+          const data = {
+            ...infoData,
+            ...parentData,
+            // Les emails viennent du parent (plus à jour)
+            clientEmail2: parentData?.clientEmail2 || infoData?.clientEmail2,
+            clientEmail3: parentData?.clientEmail3 || infoData?.clientEmail3
+          };
+
+          if (data.nom || infoSnapshot.docs.length > 0) {
             const chantier: Chantier = {
               id: chantierId,
               nom: data.nom || 'Chantier sans nom',
               description: data.description || '',
               clientNom: data.clientNom || '',
               clientEmail: data.clientEmail || '',
+              clientEmail2: data.clientEmail2 || undefined,
+              clientEmail3: data.clientEmail3 || undefined,
               clientTelephone: data.clientTelephone || '',
               adresse: data.adresse || '',
               dateDebut: data.dateDebut?.toDate() || new Date(),
@@ -128,6 +158,11 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
 
             allChantiers.push(chantier);
             console.log(`✅ Chantier ${chantierId} chargé:`, chantier.nom, `| Budget: ${chantier.budget}€`);
+            console.log(`📧 Emails:`, {
+              email1: chantier.clientEmail,
+              email2: chantier.clientEmail2,
+              email3: chantier.clientEmail3
+            });
           } else {
             // Si pas de sous-collection info, utiliser les données du document principal
             const docData = chantierDoc.data();
@@ -138,6 +173,8 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
                 description: docData.description || '',
                 clientNom: docData.clientNom || '',
                 clientEmail: docData.clientEmail || '',
+                clientEmail2: docData.clientEmail2 || undefined,
+                clientEmail3: docData.clientEmail3 || undefined,
                 clientTelephone: docData.clientTelephone || '',
                 adresse: docData.adresse || '',
                 dateDebut: docData.dateDebut?.toDate() || new Date(),
@@ -150,6 +187,11 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
               };
               allChantiers.push(chantier);
               console.log(`✅ Chantier ${chantierId} chargé depuis le document principal:`, chantier.nom);
+              console.log(`📧 Emails (doc principal):`, {
+                email1: chantier.clientEmail,
+                email2: chantier.clientEmail2,
+                email3: chantier.clientEmail3
+              });
             } else {
               console.warn(`⚠️ Chantier ${chantierId} n'a pas de nom, ignoré`);
             }
@@ -750,6 +792,27 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
                         {chantier.id}
                       </span>
                     </div>
+                    
+                    {/* Emails du client */}
+                    <div className="space-y-1">
+                      <div className="flex items-center space-x-2 text-xs text-gray-500">
+                        <Mail className="w-3 h-3" />
+                        <span className="truncate">{chantier.clientEmail}</span>
+                      </div>
+                      {chantier.clientEmail2 && (
+                        <div className="flex items-center space-x-2 text-xs text-blue-600 pl-5">
+                          <Mail className="w-3 h-3" />
+                          <span className="truncate">{chantier.clientEmail2}</span>
+                        </div>
+                      )}
+                      {chantier.clientEmail3 && (
+                        <div className="flex items-center space-x-2 text-xs text-blue-600 pl-5">
+                          <Mail className="w-3 h-3" />
+                          <span className="truncate">{chantier.clientEmail3}</span>
+                        </div>
+                      )}
+                    </div>
+                    
                     <div className="flex items-center space-x-2 text-sm text-gray-600">
                       <MapPin className="w-4 h-4" />
                       <span className="line-clamp-1">{chantier.adresse}</span>
