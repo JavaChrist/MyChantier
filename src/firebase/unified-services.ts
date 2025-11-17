@@ -279,6 +279,25 @@ export const unifiedCommandesService = {
       dateFinPrevue: Timestamp.fromDate(commande.dateFinPrevue)
     });
     return docRef.id;
+  },
+
+  // Mettre à jour une commande
+  async update(chantierId: string, commandeId: string, updates: Partial<Commande>): Promise<void> {
+    const docRef = doc(db, `chantiers/${chantierId}/commandes`, commandeId);
+    const updateData: any = { ...updates };
+
+    // Convertir les dates en Timestamp si présentes
+    if (updateData.dateCommande) {
+      updateData.dateCommande = Timestamp.fromDate(updateData.dateCommande);
+    }
+    if (updateData.dateDebutPrevue) {
+      updateData.dateDebutPrevue = Timestamp.fromDate(updateData.dateDebutPrevue);
+    }
+    if (updateData.dateFinPrevue) {
+      updateData.dateFinPrevue = Timestamp.fromDate(updateData.dateFinPrevue);
+    }
+
+    await updateDoc(docRef, updateData);
   }
 };
 

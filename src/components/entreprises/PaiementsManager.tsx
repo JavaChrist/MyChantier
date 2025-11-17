@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, CreditCard, Calendar, Euro, Check, X, AlertTriangle, Clock, DollarSign, FileText, Edit3 } from 'lucide-react';
-import { commandesService, devisService } from '../../firebase/entreprises';
-import { unifiedPaiementsService } from '../../firebase/unified-services';
+import { unifiedPaiementsService, unifiedCommandesService, unifiedDevisService } from '../../firebase/unified-services';
 import type { Paiement, Commande, Devis } from '../../firebase/unified-services';
 import { ConfirmModal } from '../ConfirmModal';
 import { Modal } from '../Modal';
@@ -33,13 +32,15 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
       setLoading(true);
       console.log(`🔍 Chargement paiements pour entreprise ${entrepriseId} dans chantier ${chantierId}`);
       
-      // Charger TOUS les paiements du chantier puis filtrer par entreprise
-      const [allPaiements, commandesData] = await Promise.all([
+      // Charger TOUS les paiements et commandes du chantier puis filtrer par entreprise
+      const [allPaiements, allCommandes] = await Promise.all([
         unifiedPaiementsService.getByChantier(chantierId),
-        commandesService.getByEntreprise(entrepriseId)
+        unifiedCommandesService.getByChantier(chantierId)
       ]);
 
       const paiementsEntreprise = allPaiements.filter(p => p.entrepriseId === entrepriseId);
+      const commandesData = allCommandes.filter(c => c.entrepriseId === entrepriseId);
+      
       console.log(`✅ ${paiementsEntreprise.length} paiements chargés pour cette entreprise`);
       
       setPaiements(paiementsEntreprise);
@@ -65,11 +66,14 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
     try {
       console.log('🚀 BOUTON CLIQUÉ - Recherche devis validés pour entreprise:', entrepriseId);
 
-      // Récupérer les devis et commandes de cette entreprise
-      const [tousDevis, toutesCommandes] = await Promise.all([
-        devisService.getByEntreprise(entrepriseId),
-        commandesService.getByEntreprise(entrepriseId)
+      // Récupérer les devis et commandes de cette entreprise depuis V2
+      const [allDevis, allCommandes] = await Promise.all([
+        unifiedDevisService.getByChantier(chantierId),
+        unifiedCommandesService.getByChantier(chantierId)
       ]);
+      
+      const tousDevis = allDevis.filter(d => d.entrepriseId === entrepriseId);
+      const toutesCommandes = allCommandes.filter(c => c.entrepriseId === entrepriseId);
 
       const devisValides = tousDevis.filter(d => d.statut === 'valide');
       console.log('📋 Devis trouvés:', tousDevis.length, 'dont validés:', devisValides.length);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, CheckCircle, Download, X, FolderOpen } from 'lucide-react';
+import { FileText, CheckCircle, Download, X, FolderOpen, AlertCircle } from 'lucide-react';
 import { Modal } from '../Modal';
 import { unifiedDevisService, unifiedDocumentsService } from '../../firebase/unified-services';
 
@@ -8,13 +8,20 @@ interface ClientDocumentsProps {
   chantierId: string;
   onReload?: () => void;
   entreprises?: any[];
+  initialFilter?: 'all' | 'en-attente' | 'valide' | 'refuse';
 }
 
-export function ClientDocuments({ devis, chantierId, onReload, entreprises = [] }: ClientDocumentsProps) {
+export function ClientDocuments({ devis, chantierId, onReload, entreprises = [], initialFilter = 'all' }: ClientDocumentsProps) {
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [validationAction, setValidationAction] = useState<{ devis: any; decision: 'valide' | 'refuse' } | null>(null);
   const [documents, setDocuments] = useState<any[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(true);
+  const [filterStatut, setFilterStatut] = useState<'all' | 'en-attente' | 'valide' | 'refuse'>(initialFilter);
+  
+  // Mettre à jour le filtre si initialFilter change
+  useEffect(() => {
+    setFilterStatut(initialFilter);
+  }, [initialFilter]);
 
   // Charger les documents administratifs
   useEffect(() => {
@@ -103,20 +110,66 @@ export function ClientDocuments({ devis, chantierId, onReload, entreprises = [] 
     }
   };
 
+  // Filtrer les devis selon le statut sélectionné
+  const devisFiltres = filterStatut === 'all' 
+    ? devis 
+    : devis.filter(d => d.statut === filterStatut);
+
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
             <h2 className="text-xl font-semibold text-gray-800">Vos documents</h2>
             <p className="text-sm text-gray-600">Devis, contrats et documents de votre chantier</p>
           </div>
-          <div className="text-sm text-gray-500">
-            {devis.length} document{devis.length > 1 ? 's' : ''}
+          
+          {/* Filtres par statut */}
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setFilterStatut('all')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                filterStatut === 'all' 
+                  ? 'bg-primary-500 text-white' 
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Tous ({devis.length})
+            </button>
+            <button
+              onClick={() => setFilterStatut('en-attente')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                filterStatut === 'en-attente' 
+                  ? 'bg-yellow-500 text-white' 
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              En attente ({devis.filter(d => d.statut === 'en-attente').length})
+            </button>
+            <button
+              onClick={() => setFilterStatut('valide')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                filterStatut === 'valide' 
+                  ? 'bg-green-500 text-white' 
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Validés ({devis.filter(d => d.statut === 'valide').length})
+            </button>
+            <button
+              onClick={() => setFilterStatut('refuse')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                filterStatut === 'refuse' 
+                  ? 'bg-red-500 text-white' 
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Refusés ({devis.filter(d => d.statut === 'refuse').length})
+            </button>
           </div>
         </div>
 
-        {devis.length === 0 ? (
+        {devisFiltres.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <FileText className="w-8 h-8 text-gray-400" />
@@ -128,7 +181,7 @@ export function ClientDocuments({ devis, chantierId, onReload, entreprises = [] 
           </div>
         ) : (
           <div className="space-y-4">
-            {devis.map((devisItem: any) => (
+            {devisFiltres.map((devisItem: any) => (
               <div
                 key={devisItem.id}
                 className="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-all"

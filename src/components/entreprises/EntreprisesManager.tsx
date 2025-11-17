@@ -5,6 +5,7 @@ import type { Entreprise } from '../../firebase/entreprises';
 import { useChantier } from '../../contexts/ChantierContext';
 import { useChantierData } from '../../hooks/useChantierData';
 import { Modal } from '../Modal';
+import { ConfirmModal } from '../ConfirmModal';
 import { EntrepriseForm } from './EntrepriseForm';
 import { DevisManager } from './DevisManager';
 import { CommandesManager } from './CommandesManager';
@@ -30,6 +31,8 @@ export function EntreprisesManager() {
   const [showDevis, setShowDevis] = useState<string | null>(null);
   const [showCommandes, setShowCommandes] = useState<string | null>(null);
   const [showPaiements, setShowPaiements] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [entrepriseToDelete, setEntrepriseToDelete] = useState<Entreprise | null>(null);
   
   // Fonction pour compter les éléments par entreprise
   const getEntrepriseStats = (entrepriseId: string) => {
@@ -100,15 +103,28 @@ export function EntreprisesManager() {
     }
   };
 
-  const handleDeleteEntreprise = async (id: string) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer cette entreprise ?')) {
-      try {
-        await entreprisesService.delete(id);
-        await reloadData();
-      } catch (error) {
-        console.error('Erreur lors de la suppression:', error);
-        alert('Erreur lors de la suppression.');
-      }
+  const handleDeleteEntreprise = (entreprise: Entreprise) => {
+    setEntrepriseToDelete(entreprise);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteEntreprise = async () => {
+    if (!entrepriseToDelete || !chantierId) return;
+
+    try {
+      console.log(`🗑️ Suppression entreprise ${entrepriseToDelete.nom} (${entrepriseToDelete.id}) du chantier ${chantierId}`);
+      
+      // Utiliser la bonne fonction pour la structure V2
+      await entreprisesService.deleteInChantier(chantierId, entrepriseToDelete.id!);
+      
+      console.log('✅ Entreprise supprimée de Firebase');
+      await reloadData();
+      
+      setShowDeleteConfirm(false);
+      setEntrepriseToDelete(null);
+    } catch (error) {
+      console.error('Erreur lors de la suppression:', error);
+      alert('❌ Erreur lors de la suppression de l\'entreprise.');
     }
   };
 
@@ -253,7 +269,7 @@ export function EntreprisesManager() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      entreprise.id && handleDeleteEntreprise(entreprise.id);
+                      handleDeleteEntreprise(entreprise);
                     }}
                     className="p-1 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded"
                   >
@@ -415,6 +431,7 @@ export function EntreprisesManager() {
           <CommandesManager
             entrepriseId={showCommandes}
             entrepriseName={entreprises.find(e => e.id === showCommandes)?.nom || ''}
+            chantierId={chantierId || ''}
           />
         </Modal>
       )}
@@ -434,6 +451,21 @@ export function EntreprisesManager() {
           />
         </Modal>
       )}
+
+      {/* Modal de confirmation de suppression */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onConfirm={confirmDeleteEntreprise}
+        onCancel={() => {
+          setShowDeleteConfirm(false);
+          setEntrepriseToDelete(null);
+        }}
+        title="Supprimer l'entreprise"
+        message={`Voulez-vous vraiment supprimer l'entreprise "${entrepriseToDelete?.nom}" ?\n\nCette action supprimera également tous les devis, commandes et paiements associés.`}
+        confirmText="Supprimer"
+        cancelText="Annuler"
+        type="danger"
+      />
     </div>
   );
 }

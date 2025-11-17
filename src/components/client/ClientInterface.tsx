@@ -18,6 +18,7 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
   const [currentView, setCurrentView] = useState('overview');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [chantierNom, setChantierNom] = useState('Mon Chantier');
+  const [documentsFilter, setDocumentsFilter] = useState<'all' | 'en-attente' | 'valide' | 'refuse'>('all');
   const { entreprises, devis, commandes, paiements, loading, reloadData } = useChantierData(chantierId);
   
   // Compter les messages non lus
@@ -46,15 +47,21 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
   const stats = {
     entreprises: entreprises.length,
     devisEnAttente: devis.filter(d => d.statut === 'en-attente').length,
-    devisValides: devis.filter(d => d.statut === 'valide').length,
+    devisValides: devis.filter(d => d.statut === 'valide').length, // Seulement les validés, PAS les refusés
+    devisRefuses: devis.filter(d => d.statut === 'refuse').length, // Nouveau: compter les refusés
     commandesActives: commandes.filter(c => ['commandee', 'en-cours'].includes(c.statut)).length,
     paiementsEnRetard: paiements.filter(p => p.statut === 'prevu' && p.datePrevue < new Date()).length
+  };
+
+  const handleNavigateToDocuments = (filter: 'all' | 'en-attente' | 'valide' | 'refuse' = 'all') => {
+    setDocumentsFilter(filter);
+    setCurrentView('documents');
   };
 
   const renderContent = () => {
     switch (currentView) {
       case 'overview':
-        return <ClientOverview stats={stats} onNavigate={setCurrentView} />;
+        return <ClientOverview stats={stats} onNavigate={setCurrentView} onNavigateToDocuments={handleNavigateToDocuments} />;
       case 'entreprises':
         return <ClientEntreprises entreprises={entreprises} onNavigate={setCurrentView} />;
       case 'chat':
@@ -65,13 +72,13 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
           ...d,
           entrepriseNom: entreprises.find(e => e.id === d.entrepriseId)?.nom || 'Entreprise inconnue'
         }));
-        return <ClientDocuments devis={devisAvecEntreprise} chantierId={chantierId} onReload={reloadData} entreprises={entreprises} />;
+        return <ClientDocuments devis={devisAvecEntreprise} chantierId={chantierId} onReload={reloadData} entreprises={entreprises} initialFilter={documentsFilter} />;
       case 'planning':
         return <ClientPlanning chantierId={chantierId} />;
       case 'paiements':
         return <ClientPaiements paiements={paiements} entreprises={entreprises} />;
       default:
-        return <ClientOverview stats={stats} entreprises={entreprises} devis={devis} onNavigate={setCurrentView} />;
+        return <ClientOverview stats={stats} entreprises={entreprises} devis={devis} onNavigate={setCurrentView} onNavigateToDocuments={handleNavigateToDocuments} />;
     }
   };
 
@@ -257,7 +264,7 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
 }
 
 // Vue d'ensemble pour le client
-function ClientOverview({ stats, onNavigate }: any) {
+function ClientOverview({ stats, onNavigate, onNavigateToDocuments }: any) {
   const progression = Math.round((stats.devisValides / Math.max(stats.devisValides + stats.devisEnAttente, 1)) * 100);
 
   return (
@@ -294,7 +301,7 @@ function ClientOverview({ stats, onNavigate }: any) {
         </button>
 
         <button
-          onClick={() => onNavigate('documents')}
+          onClick={() => onNavigateToDocuments('en-attente')}
           className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-yellow-200 transition-all cursor-pointer w-full text-left"
         >
           <div className="flex items-center space-x-3">
@@ -309,7 +316,7 @@ function ClientOverview({ stats, onNavigate }: any) {
         </button>
 
         <button
-          onClick={() => onNavigate('documents')}
+          onClick={() => onNavigateToDocuments('valide')}
           className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-green-200 transition-all cursor-pointer w-full text-left"
         >
           <div className="flex items-center space-x-3">

@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, FileText, Check, X, AlertCircle, Upload, Download, Eye, Mail, ArrowRight } from 'lucide-react';
-import { commandesService, devisService } from '../../firebase/entreprises';
+import { unifiedCommandesService, unifiedDevisService } from '../../firebase/unified-services';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../firebase/config';
-import type { Commande, Devis } from '../../firebase/entreprises';
+import type { Commande, Devis } from '../../firebase/unified-services';
 
 interface CommandesManagerProps {
   entrepriseId: string;
   entrepriseName: string;
+  chantierId: string;
 }
 
 // Fonction d'upload pour les devis signés
@@ -48,7 +49,7 @@ const uploadDevisSigneFile = async (entrepriseId: string, commandeId: string, fi
   }
 };
 
-export function CommandesManager({ entrepriseId, entrepriseName }: CommandesManagerProps) {
+export function CommandesManager({ entrepriseId, entrepriseName, chantierId }: CommandesManagerProps) {
   const [commandes, setCommandes] = useState<Commande[]>([]);
   const [devisValides, setDevisValides] = useState<Devis[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,10 +64,15 @@ export function CommandesManager({ entrepriseId, entrepriseName }: CommandesMana
   const loadData = async () => {
     try {
       setLoading(true);
-      const [commandesData, devisData] = await Promise.all([
-        commandesService.getByEntreprise(entrepriseId),
-        devisService.getByEntreprise(entrepriseId)
+      // Charger depuis la nouvelle structure V2
+      const [allCommandesData, allDevisData] = await Promise.all([
+        unifiedCommandesService.getByChantier(chantierId),
+        unifiedDevisService.getByChantier(chantierId)
       ]);
+
+      // Filtrer par entreprise
+      const commandesData = allCommandesData.filter(c => c.entrepriseId === entrepriseId);
+      const devisData = allDevisData.filter(d => d.entrepriseId === entrepriseId);
 
       setCommandes(commandesData);
       // Filtrer seulement les devis validés qui n'ont pas encore de commande
@@ -99,13 +105,19 @@ export function CommandesManager({ entrepriseId, entrepriseName }: CommandesMana
     try {
       let commandeId: string;
 
+      // Ajouter l'entrepriseId aux données
+      const fullCommandeData = {
+        ...commandeData,
+        entrepriseId: entrepriseId
+      };
+
       if (selectedCommande?.id) {
-        // Mise à jour
-        await commandesService.update(entrepriseId, selectedCommande.id, commandeData);
+        // Mise à jour - structure V2
+        await unifiedCommandesService.update(chantierId, selectedCommande.id, fullCommandeData);
         commandeId = selectedCommande.id;
       } else {
-        // Création
-        commandeId = await commandesService.create(entrepriseId, commandeData);
+        // Création - structure V2
+        commandeId = await unifiedCommandesService.create(chantierId, fullCommandeData);
       }
 
       // Upload du devis signé si fourni
@@ -113,7 +125,7 @@ export function CommandesManager({ entrepriseId, entrepriseName }: CommandesMana
         try {
           const fileUrl = await uploadDevisSigneFile(entrepriseId, commandeId, devisSigneFile);
           // Mettre à jour la commande avec l'URL du devis signé
-          await commandesService.update(entrepriseId, commandeId, { devisSigneUrl: fileUrl });
+          await unifiedCommandesService.update(chantierId, commandeId, { devisSigneUrl: fileUrl });
         } catch (uploadError: any) {
           console.error('Erreur upload devis signé:', uploadError);
           alert(`Erreur lors de l'upload du devis signé: ${uploadError?.message || 'Erreur inconnue'}`);
