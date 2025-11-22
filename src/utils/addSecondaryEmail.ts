@@ -1,5 +1,6 @@
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { emitGlobalAlert } from './alertBus';
 
 /**
  * Ajouter un email secondaire à un chantier
@@ -18,7 +19,11 @@ export async function ajouterEmailSecondaire(
     
     if (!chantierDoc.exists()) {
       console.error(`❌ Chantier ${chantierId} non trouvé`);
-      alert(`Chantier ${chantierId} non trouvé`);
+      emitGlobalAlert({
+        title: 'Chantier introuvable',
+        message: `Chantier ${chantierId} non trouvé`,
+        type: 'error'
+      });
       return false;
     }
     
@@ -70,14 +75,22 @@ export async function ajouterEmailSecondaire(
       clientEmail3: updatedDoc.data()?.clientEmail3
     });
     
-    alert(`✅ Email(s) ajouté(s) avec succès !\n\nRechargez la page pour voir les changements.`);
+    emitGlobalAlert({
+      title: 'Emails ajoutés',
+      message: 'Email(s) ajouté(s) avec succès ! Rechargez la page pour voir les changements.',
+      type: 'success'
+    });
     
     return true;
     
   } catch (error: any) {
     console.error('❌ Erreur ajout email:', error);
     console.error('Détails:', error.message, error.code);
-    alert(`❌ Erreur lors de l'ajout de l'email:\n\n${error.message}`);
+    emitGlobalAlert({
+      title: 'Erreur ajout email',
+      message: `Erreur lors de l'ajout de l'email:\n\n${error.message}`,
+      type: 'error'
+    });
     return false;
   }
 }

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { FileText, CheckCircle, Download, X, FolderOpen, AlertCircle } from 'lucide-react';
 import { Modal } from '../Modal';
 import { unifiedDevisService, unifiedDocumentsService } from '../../firebase/unified-services';
+import { useAlertModal } from '../AlertModal';
 
 interface ClientDocumentsProps {
   devis: any[];
@@ -17,6 +18,7 @@ export function ClientDocuments({ devis, chantierId, onReload, entreprises = [],
   const [documents, setDocuments] = useState<any[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(true);
   const [filterStatut, setFilterStatut] = useState<'all' | 'en-attente' | 'valide' | 'refuse'>(initialFilter);
+  const { showAlert, AlertModalComponent } = useAlertModal();
   
   // Mettre à jour le filtre si initialFilter change
   useEffect(() => {
@@ -99,14 +101,17 @@ export function ClientDocuments({ devis, chantierId, onReload, entreprises = [],
       }
 
       // Message de confirmation
-      alert(decision === 'valide'
-        ? '✅ Devis validé avec succès !\n\nLe professionnel en sera informé.'
-        : '❌ Devis refusé.\n\nLe professionnel en sera informé et pourra vous proposer une révision.'
+      showAlert(
+        decision === 'valide' ? 'Devis validé' : 'Devis refusé',
+        decision === 'valide'
+          ? 'Devis validé avec succès ! Le professionnel en sera informé.'
+          : 'Devis refusé. Le professionnel en sera informé et pourra vous proposer une révision.',
+        decision === 'valide' ? 'success' : 'warning'
       );
 
     } catch (error) {
       console.error('Erreur sauvegarde décision:', error);
-      alert('❌ Erreur lors de l\'enregistrement de votre décision. Veuillez réessayer.');
+      showAlert('Erreur', 'Erreur lors de l\'enregistrement de votre décision. Veuillez réessayer.', 'error');
     }
   };
 
@@ -418,6 +423,7 @@ export function ClientDocuments({ devis, chantierId, onReload, entreprises = [],
           </div>
         </div>
       </Modal>
+      <AlertModalComponent />
     </div>
   );
 }

@@ -7,9 +7,10 @@ interface ModalProps {
   title: string;
   children: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  bodyClassName?: string;
 }
 
-export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
+export function Modal({ isOpen, onClose, title, children, size = 'md', bodyClassName }: ModalProps) {
   if (!isOpen) return null;
 
   const sizeClasses = {
@@ -32,7 +33,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
             <X className="w-5 h-5 text-gray-400" />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className={`flex-1 ${bodyClassName ?? 'overflow-y-auto'}`}>
           {children}
         </div>
       </div>

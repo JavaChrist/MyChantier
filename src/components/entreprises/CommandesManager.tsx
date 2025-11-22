@@ -4,6 +4,7 @@ import { unifiedCommandesService, unifiedDevisService } from '../../firebase/uni
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../firebase/config';
 import type { Commande, Devis } from '../../firebase/unified-services';
+import { useAlertModal } from '../AlertModal';
 
 interface CommandesManagerProps {
   entrepriseId: string;
@@ -56,6 +57,7 @@ export function CommandesManager({ entrepriseId, entrepriseName, chantierId }: C
   const [showForm, setShowForm] = useState(false);
   const [selectedCommande, setSelectedCommande] = useState<Commande | null>(null);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const { showAlert, AlertModalComponent } = useAlertModal();
 
   useEffect(() => {
     loadData();
@@ -128,7 +130,7 @@ export function CommandesManager({ entrepriseId, entrepriseName, chantierId }: C
           await unifiedCommandesService.update(chantierId, commandeId, { devisSigneUrl: fileUrl });
         } catch (uploadError: any) {
           console.error('Erreur upload devis signé:', uploadError);
-          alert(`Erreur lors de l'upload du devis signé: ${uploadError?.message || 'Erreur inconnue'}`);
+          showAlert('Upload du devis signé', `Erreur lors de l'upload du devis signé: ${uploadError?.message || 'Erreur inconnue'}`, 'error');
         }
       }
 
@@ -136,7 +138,7 @@ export function CommandesManager({ entrepriseId, entrepriseName, chantierId }: C
       setShowForm(false);
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
-      alert('Erreur lors de la sauvegarde de la commande.');
+      showAlert('Erreur', 'Erreur lors de la sauvegarde de la commande.', 'error');
     }
   };
 
@@ -177,29 +179,40 @@ export function CommandesManager({ entrepriseId, entrepriseName, chantierId }: C
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <div className="text-gray-400">Chargement des commandes...</div>
-      </div>
+      <>
+        <div className="flex items-center justify-center py-8">
+          <div className="text-gray-400">Chargement des commandes...</div>
+        </div>
+        <AlertModalComponent />
+      </>
     );
   }
 
   if (showForm) {
     return (
-      <CommandeForm
-        commande={selectedCommande}
-        devisValides={devisValides}
-        onSave={handleSaveCommande}
-        onCancel={() => setShowForm(false)}
-      />
+      <>
+        <CommandeForm
+          commande={selectedCommande}
+          devisValides={devisValides}
+          onSave={handleSaveCommande}
+          onCancel={() => setShowForm(false)}
+          showAlert={showAlert}
+        />
+        <AlertModalComponent />
+      </>
     );
   }
 
   if (showEmailModal && selectedCommande) {
     return (
-      <EmailModal
-        commande={selectedCommande}
-        onClose={() => setShowEmailModal(false)}
-      />
+      <>
+        <EmailModal
+          commande={selectedCommande}
+          onClose={() => setShowEmailModal(false)}
+          showAlert={showAlert}
+        />
+        <AlertModalComponent />
+      </>
     );
   }
 
@@ -338,6 +351,7 @@ export function CommandesManager({ entrepriseId, entrepriseName, chantierId }: C
           ))}
         </div>
       )}
+      <AlertModalComponent />
     </div>
   );
 }
@@ -347,12 +361,14 @@ function CommandeForm({
   commande,
   devisValides,
   onSave,
-  onCancel
+  onCancel,
+  showAlert
 }: {
   commande: Commande | null;
   devisValides: Devis[];
   onSave: (commande: Omit<Commande, 'id' | 'entrepriseId'>, devisSigneFile?: File) => void;
   onCancel: () => void;
+  showAlert: (title: string, message: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
 }) {
   const [formData, setFormData] = useState({
     devisId: '',
@@ -442,12 +458,12 @@ function CommandeForm({
       ];
 
       if (!allowedTypes.includes(file.type)) {
-        alert('Type de fichier non autorisé. Utilisez PDF, Word, JPEG ou PNG.');
+        showAlert('Format non pris en charge', 'Type de fichier non autorisé. Utilisez PDF, Word, JPEG ou PNG.', 'warning');
         return;
       }
 
       if (file.size > 10 * 1024 * 1024) {
-        alert('Le fichier est trop volumineux (max 10MB).');
+        showAlert('Fichier trop volumineux', 'Le fichier est trop volumineux (max 10MB).', 'warning');
         return;
       }
 
@@ -661,10 +677,12 @@ function CommandeForm({
 // Composant modal pour l'envoi d'email
 function EmailModal({
   commande,
-  onClose
+  onClose,
+  showAlert
 }: {
   commande: Commande;
   onClose: () => void;
+  showAlert: (title: string, message: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
 }) {
   const [emailData, setEmailData] = useState({
     destinataire: '',
@@ -692,9 +710,9 @@ Objet: ${emailData.sujet}
 ${emailData.message}`;
 
     navigator.clipboard.writeText(fullEmail).then(() => {
-      alert('Email copié dans le presse-papiers ! Tu peux le coller dans Ionos.');
+      showAlert('Email copié', 'Email copié dans le presse-papiers ! Tu peux le coller dans Ionos.', 'success');
     }).catch(() => {
-      alert('Impossible de copier. Sélectionne et copie le texte manuellement.');
+      showAlert('Copie impossible', 'Impossible de copier. Sélectionne et copie le texte manuellement.', 'error');
     });
   };
 

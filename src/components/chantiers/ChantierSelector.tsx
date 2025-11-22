@@ -5,6 +5,7 @@ import type { Chantier } from '../../firebase/chantiers';
 import { useChantier } from '../../contexts/ChantierContext';
 import { Modal } from '../Modal';
 import { ConfirmModal } from '../ConfirmModal';
+import { useAlertModal } from '../AlertModal';
 
 interface ChantierSelectorProps {
   professionalId: string;
@@ -952,6 +953,7 @@ function NewChantierForm({
     statut: 'planifie' as 'planifie' | 'en-cours' | 'termine' | 'suspendu',
     notes: ''
   });
+  const { showAlert, AlertModalComponent } = useAlertModal();
 
   useEffect(() => {
     if (chantier) {
@@ -978,19 +980,19 @@ function NewChantierForm({
 
     // Valider les champs requis
     if (!formData.nom.trim()) {
-      alert('Le nom du chantier est requis');
+      showAlert('Champ manquant', 'Le nom du chantier est requis.', 'warning');
       return;
     }
     if (!formData.clientEmail.trim()) {
-      alert('L\'email du client est requis');
+      showAlert('Champ manquant', 'L\'email du client est requis.', 'warning');
       return;
     }
     if (!formData.dateDebut) {
-      alert('La date de début est requise');
+      showAlert('Champ manquant', 'La date de début est requise.', 'warning');
       return;
     }
     if (!formData.dateFinPrevue) {
-      alert('La date de fin prévue est requise');
+      showAlert('Champ manquant', 'La date de fin prévue est requise.', 'warning');
       return;
     }
 
@@ -999,11 +1001,11 @@ function NewChantierForm({
     const dateFinPrevue = new Date(formData.dateFinPrevue);
 
     if (isNaN(dateDebut.getTime())) {
-      alert('La date de début est invalide');
+      showAlert('Date invalide', 'La date de début est invalide.', 'warning');
       return;
     }
     if (isNaN(dateFinPrevue.getTime())) {
-      alert('La date de fin prévue est invalide');
+      showAlert('Date invalide', 'La date de fin prévue est invalide.', 'warning');
       return;
     }
 
@@ -1028,7 +1030,8 @@ function NewChantierForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <>
+      <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -1220,6 +1223,8 @@ function NewChantierForm({
           {chantier ? 'Modifier le chantier' : 'Créer le chantier'}
         </button>
       </div>
-    </form>
+      </form>
+      <AlertModalComponent />
+    </>
   );
 }

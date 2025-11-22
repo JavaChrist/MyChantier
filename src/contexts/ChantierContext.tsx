@@ -4,8 +4,10 @@ import type { Chantier } from '../firebase/chantiers';
 interface ChantierContextType {
   chantierId: string | null;
   chantierActuel: Chantier | null;
+  budgetActuel: number | null;
   setChantierActuel: (chantier: Chantier | null) => void;
   setChangtierId: (id: string | null) => void;
+  setBudgetActuel: (montant: number | null) => void;
 }
 
 const ChantierContext = createContext<ChantierContextType | undefined>(undefined);
@@ -13,6 +15,7 @@ const ChantierContext = createContext<ChantierContextType | undefined>(undefined
 export function ChantierProvider({ children }: { children: React.ReactNode }) {
   const [chantierId, setChantierId] = useState<string | null>(null);
   const [chantierActuel, setChantierActuel] = useState<Chantier | null>(null);
+  const [budgetActuel, setBudgetActuel] = useState<number | null>(null);
 
   // Sauvegarder le chantier sélectionné dans le localStorage
   useEffect(() => {
@@ -42,8 +45,10 @@ export function ChantierProvider({ children }: { children: React.ReactNode }) {
     <ChantierContext.Provider value={{
       chantierId,
       chantierActuel,
+      budgetActuel,
       setChantierActuel,
-      setChangtierId
+      setChangtierId,
+      setBudgetActuel
     }}>
       {children}
     </ChantierContext.Provider>

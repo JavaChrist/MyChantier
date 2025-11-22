@@ -7,9 +7,10 @@ import { useChantierData } from '../../hooks/useChantierData';
 import type { Entreprise } from '../../firebase/entreprises';
 import { Modal } from '../Modal';
 import { ConfirmModal } from '../ConfirmModal';
+import { useAlertModal } from '../AlertModal';
 
 export function PaiementsGlobaux() {
-  const { chantierId, chantierActuel } = useChantier();
+  const { chantierId, chantierActuel, setBudgetActuel } = useChantier();
   const { entreprises, paiements: paiementsData, loading: dataLoading, reloadData } = useChantierData(chantierId);
 
   const [paiements, setPaiements] = useState<(Paiement & { entrepriseNom: string; secteur: string })[]>([]);
@@ -21,6 +22,7 @@ export function PaiementsGlobaux() {
   const [selectedBudget, setSelectedBudget] = useState<BudgetPrevisionnel | null>(null);
   const [showConfirmPaiementModal, setShowConfirmPaiementModal] = useState(false);
   const [paiementToUpdate, setPaiementToUpdate] = useState<(Paiement & { entrepriseNom: string; secteur: string }) | null>(null);
+  const { showAlert, AlertModalComponent } = useAlertModal();
 
   useEffect(() => {
     if (!dataLoading && entreprises.length >= 0) {
@@ -57,9 +59,12 @@ export function PaiementsGlobaux() {
       const budgetsData = await unifiedBudgetService.getByChantier(chantierId);
       console.log(`✅ ${budgetsData.length} budgets chargés`);
       setBudgets(budgetsData);
+      const actif = budgetsData.find(b => b.statut === 'actif') || null;
+      setBudgetActuel(actif ? actif.montantActuel : null);
     } catch (error) {
       console.error('Erreur chargement budgets:', error);
       setBudgets([]);
+      setBudgetActuel(null);
     }
   };
 
@@ -96,14 +101,14 @@ export function PaiementsGlobaux() {
       setPaiementToUpdate(null);
     } catch (error) {
       console.error('Erreur lors de la mise à jour:', error);
-      alert('Erreur lors de la mise à jour du paiement');
+      showAlert('Erreur', 'Erreur lors de la mise à jour du paiement.', 'error');
     }
   };
 
   const handleSaveBudget = async (budgetData: Omit<BudgetPrevisionnel, 'id'>) => {
     try {
       if (!chantierId) {
-        alert('Aucun chantier sélectionné');
+        showAlert('Aucun chantier', 'Aucun chantier sélectionné.', 'warning');
         return;
       }
 
@@ -126,7 +131,7 @@ export function PaiementsGlobaux() {
       setShowBudgetModal(false);
     } catch (error) {
       console.error('❌ Erreur lors de la sauvegarde budget:', error);
-      alert(`Erreur lors de la sauvegarde: ${(error as any).message || error}`);
+      showAlert('Erreur', `Erreur lors de la sauvegarde: ${(error as any).message || error}`, 'error');
     }
   };
 
@@ -187,11 +192,14 @@ export function PaiementsGlobaux() {
 
   if (dataLoading) {
     return (
-      <div className="mobile-padding flex items-center justify-center min-h-64">
-        <div className="text-gray-400">
-          Chargement des paiements {chantierActuel ? `du chantier "${chantierActuel.nom}"` : ''}...
+      <>
+        <div className="mobile-padding flex items-center justify-center min-h-64">
+          <div className="text-gray-400">
+            Chargement des paiements {chantierActuel ? `du chantier "${chantierActuel.nom}"` : ''}...
+          </div>
         </div>
-      </div>
+        <AlertModalComponent />
+      </>
     );
   }
 
@@ -521,6 +529,7 @@ export function PaiementsGlobaux() {
         onClose={() => setShowBudgetModal(false)}
         title={selectedBudget ? 'Modifier le budget' : 'Nouveau budget prévisionnel'}
         size="lg"
+        bodyClassName="overflow-y-auto lg:overflow-y-visible"
       >
         <BudgetForm
           budget={selectedBudget}
@@ -547,6 +556,7 @@ export function PaiementsGlobaux() {
         cancelText="Annuler"
         type="success"
       />
+      <AlertModalComponent />
     </div>
   );
 }

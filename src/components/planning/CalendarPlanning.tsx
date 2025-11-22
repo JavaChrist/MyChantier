@@ -6,6 +6,7 @@ import { useChantierData } from '../../hooks/useChantierData';
 import type { Entreprise, Commande, RendezVous } from '../../firebase/unified-services';
 import { Modal } from '../Modal';
 import { ConfirmModal } from '../ConfirmModal';
+import { useAlertModal } from '../AlertModal';
 
 type ViewType = 'month' | 'week' | 'day' | 'agenda';
 
@@ -30,6 +31,7 @@ export function CalendarPlanning() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<RendezVous | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const { showAlert, AlertModalComponent } = useAlertModal();
 
   // Plus besoin de loadData car useChantierData s'en charge
 
@@ -228,7 +230,7 @@ export function CalendarPlanning() {
 
     } catch (error: any) {
       console.error('Erreur suppression rendez-vous:', error);
-      alert(`❌ Erreur lors de la suppression : ${error.message}`);
+      showAlert('Erreur', `Erreur lors de la suppression : ${error.message}`, 'error');
     }
   };
 
@@ -236,11 +238,14 @@ export function CalendarPlanning() {
 
   if (dataLoading) {
     return (
-      <div className="mobile-padding flex items-center justify-center min-h-64">
-        <div className="text-gray-400">
-          Chargement du planning {chantierActuel ? `du chantier "${chantierActuel.nom}"` : ''}...
+      <>
+        <div className="mobile-padding flex items-center justify-center min-h-64">
+          <div className="text-gray-400">
+            Chargement du planning {chantierActuel ? `du chantier "${chantierActuel.nom}"` : ''}...
+          </div>
         </div>
-      </div>
+        <AlertModalComponent />
+      </>
     );
   }
 
@@ -371,6 +376,7 @@ export function CalendarPlanning() {
         cancelText="Annuler"
         type="danger"
       />
+      <AlertModalComponent />
     </div>
   );
 }

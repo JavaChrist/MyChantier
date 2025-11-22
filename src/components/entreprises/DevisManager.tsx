@@ -4,6 +4,7 @@ import { unifiedDevisService } from '../../firebase/unified-services';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../firebase/config';
 import type { Devis } from '../../firebase/unified-services';
+import { useAlertModal } from '../AlertModal';
 
 // Fonction d'upload réelle avec Firebase Storage
 const uploadDevisFile = async (entrepriseId: string, devisId: string, file: File): Promise<string> => {
@@ -66,6 +67,7 @@ export function DevisManager({ entrepriseId, entrepriseName, chantierId }: Devis
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [selectedDevis, setSelectedDevis] = useState<Devis | null>(null);
+  const { showAlert, AlertModalComponent } = useAlertModal();
 
   useEffect(() => {
     loadDevis();
@@ -155,7 +157,7 @@ export function DevisManager({ entrepriseId, entrepriseName, chantierId }: Devis
           console.log('Devis mis à jour avec succès dans Firebase V2');
         } catch (uploadError) {
           console.error('Erreur upload:', uploadError);
-          alert(`Erreur lors de l'upload du fichier: ${(uploadError as any).message}`);
+          showAlert('Upload du devis', `Erreur lors de l'upload du fichier: ${(uploadError as any).message}`, 'error');
           // Le devis est créé mais sans fichier
         }
       }
@@ -164,7 +166,7 @@ export function DevisManager({ entrepriseId, entrepriseName, chantierId }: Devis
       setShowForm(false);
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
-      alert('Erreur lors de la sauvegarde du devis.');
+      showAlert('Erreur', 'Erreur lors de la sauvegarde du devis.', 'error');
     }
   };
 
@@ -196,18 +198,27 @@ export function DevisManager({ entrepriseId, entrepriseName, chantierId }: Devis
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <div className="text-gray-400">Chargement des devis...</div>
-      </div>
+      <>
+        <div className="flex items-center justify-center py-8">
+          <div className="text-gray-400">Chargement des devis...</div>
+        </div>
+        <AlertModalComponent />
+      </>
     );
   }
 
   if (showForm) {
-    return <DevisForm
-      devis={selectedDevis}
-      onSave={handleSaveDevis}
-      onCancel={() => setShowForm(false)}
-    />;
+    return (
+      <>
+        <DevisForm
+          devis={selectedDevis}
+          onSave={handleSaveDevis}
+          onCancel={() => setShowForm(false)}
+          showAlert={showAlert}
+        />
+        <AlertModalComponent />
+      </>
+    );
   }
 
   return (
@@ -311,6 +322,7 @@ export function DevisManager({ entrepriseId, entrepriseName, chantierId }: Devis
           ))}
         </div>
       )}
+      <AlertModalComponent />
     </div>
   );
 }
@@ -319,11 +331,13 @@ export function DevisManager({ entrepriseId, entrepriseName, chantierId }: Devis
 function DevisForm({
   devis,
   onSave,
-  onCancel
+  onCancel,
+  showAlert
 }: {
   devis: Devis | null;
   onSave: (devis: Omit<Devis, 'id' | 'entrepriseId'>, file?: File) => void;
   onCancel: () => void;
+  showAlert: (title: string, message: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
 }) {
   const [formData, setFormData] = useState({
     numero: '',
@@ -390,12 +404,12 @@ function DevisForm({
       ];
 
       if (!allowedTypes.includes(file.type)) {
-        alert('Type de fichier non autorisé. Utilisez PDF, Word, JPEG ou PNG.');
+        showAlert('Format non pris en charge', 'Type de fichier non autorisé. Utilisez PDF, Word, JPEG ou PNG.', 'warning');
         return;
       }
 
       if (file.size > 10 * 1024 * 1024) {
-        alert('Le fichier est trop volumineux (max 10MB).');
+        showAlert('Fichier trop volumineux', 'Le fichier est trop volumineux (max 10MB).', 'warning');
         return;
       }
 

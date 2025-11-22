@@ -3,6 +3,7 @@ import { Send, Paperclip, Image, FileText, CheckCircle, X, Clock, AlertCircle } 
 import { chatService, conversationService, uploadChatFile } from '../../firebase/chat';
 import type { ChatMessage, Conversation, DecisionData } from '../../firebase/chat';
 import { Modal } from '../Modal';
+import { useAlertModal } from '../AlertModal';
 
 interface ClientChatProps {
   conversation: Conversation;
@@ -18,6 +19,7 @@ export function ClientChat({ conversation, currentUserId, currentUserName, curre
   const [loading, setLoading] = useState(false);
   const [showDecisionModal, setShowDecisionModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { showAlert, AlertModalComponent } = useAlertModal();
 
   useEffect(() => {
     if (!conversation.id) return;
@@ -79,7 +81,7 @@ export function ClientChat({ conversation, currentUserId, currentUserName, curre
       setSelectedFile(null);
     } catch (error) {
       console.error('Erreur envoi message:', error);
-      alert(`Erreur lors de l'envoi: ${error.message}`);
+      showAlert('Erreur', `Erreur lors de l'envoi: ${error.message}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -89,7 +91,7 @@ export function ClientChat({ conversation, currentUserId, currentUserName, curre
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
-        alert('Fichier trop volumineux (max 10MB)');
+        showAlert('Fichier trop volumineux', 'Fichier trop volumineux (max 10MB).', 'warning');
         return;
       }
       setSelectedFile(file);
@@ -367,6 +369,7 @@ export function ClientChat({ conversation, currentUserId, currentUserName, curre
           onSend={() => setShowDecisionModal(false)}
         />
       </Modal>
+      <AlertModalComponent />
     </div>
   );
 }

@@ -21,10 +21,15 @@ export function ChantierChat() {
   const [chatVisible, setChatVisible] = useState(false);
   const [showPurgeConfirm, setShowPurgeConfirm] = useState(false);
 
+  type LoadMessagesOptions = {
+    markAsRead?: boolean;
+    allowWelcome?: boolean;
+  };
+
   // Charger les messages du chantier actuel
   useEffect(() => {
     if (chantierActuel) {
-      loadMessagesForChantier(chantierActuel.id!, false); // Ne pas marquer comme lu au chargement
+      loadMessagesForChantier(chantierActuel.id!, { markAsRead: false, allowWelcome: true }); // Ne pas marquer comme lu au chargement
       setChatVisible(true); // Le chat est maintenant visible
     }
   }, [chantierActuel]);
@@ -40,7 +45,11 @@ export function ChantierChat() {
     }
   }, [chatVisible, chantierActuel]);
 
-  const loadMessagesForChantier = async (chantierId: string, shouldMarkAsRead: boolean = false) => {
+  const loadMessagesForChantier = async (
+    chantierId: string,
+    options: LoadMessagesOptions = {}
+  ) => {
+    const { markAsRead = false, allowWelcome = true } = options;
     try {
       console.log(`🔍 Chargement messages Firebase V2 pour ${chantierId}`);
 
@@ -50,10 +59,10 @@ export function ChantierChat() {
       console.log(`✅ ${messagesData.length} messages chargés depuis Firebase V2`);
 
       // Si aucun message, créer les messages de bienvenue
-      if (messagesData.length === 0) {
+      if (messagesData.length === 0 && allowWelcome) {
         console.log('🔄 Création des messages de bienvenue...');
         await createWelcomeMessages(chantierId);
-      } else if (shouldMarkAsRead) {
+      } else if (markAsRead) {
         // Marquer comme lus seulement si demandé explicitement
         await markMessagesAsRead(chantierId);
       }
@@ -135,7 +144,7 @@ export function ChantierChat() {
       setNewMessage('');
 
       // Recharger les messages (sans marquer comme lu, c'est notre propre message)
-      await loadMessagesForChantier(chantierActuel.id!, false);
+      await loadMessagesForChantier(chantierActuel.id!, { markAsRead: false, allowWelcome: true });
       
       // Notifier les autres composants pour mettre à jour le badge
       window.dispatchEvent(new Event('messages-updated'));
@@ -161,7 +170,7 @@ export function ChantierChat() {
       await unifiedMessagesService.create(chantierActuel.id!, validationMessage);
       console.log('✅ Demande de validation envoyée en Firebase V2');
 
-      await loadMessagesForChantier(chantierActuel.id!);
+      await loadMessagesForChantier(chantierActuel.id!, { markAsRead: false, allowWelcome: true });
       setShowValidationModal(false);
     } catch (error) {
       console.error('Erreur envoi validation:', error);
@@ -203,7 +212,7 @@ export function ChantierChat() {
       console.log(`✅ ${count} messages supprimés`);
       
       // Recharger les messages (vide)
-      await loadMessagesForChantier(chantierActuel.id, false);
+      await loadMessagesForChantier(chantierActuel.id, { markAsRead: false, allowWelcome: false });
       
       // Notifier
       window.dispatchEvent(new Event('messages-updated'));

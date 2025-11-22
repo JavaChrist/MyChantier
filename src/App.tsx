@@ -24,6 +24,7 @@ import './utils/fixDevisEntreprises';
 import './utils/cleanupDevis';
 import './utils/cleanupEtapes';
 import './utils/addSecondaryEmail';
+import { GlobalAlertListener } from './components/GlobalAlertListener';
 
 function AppContent({ userProfile, onLogout }: { userProfile: any; onLogout: () => void }) {
   const [currentView, setCurrentView] = useState('dashboard');
@@ -109,21 +110,24 @@ function AppContent({ userProfile, onLogout }: { userProfile: any; onLogout: () 
 function App() {
   // Système d'authentification Firebase
   const { userProfile, loading, error, success, login, signup, resetPassword, logout, isAuthenticated } = useAuth();
-
+  const globalAlerts = <GlobalAlertListener />;
 
 
   // Afficher l'écran de chargement pendant la vérification de l'auth
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-primary-600 rounded-full flex items-center justify-center mb-4 mx-auto">
-            <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+      <>
+        <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-primary-600 rounded-full flex items-center justify-center mb-4 mx-auto">
+              <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-100 mb-2">Suivi de Chantier</h2>
+            <p className="text-gray-400">Vérification de votre accès...</p>
           </div>
-          <h2 className="text-xl font-semibold text-gray-100 mb-2">Suivi de Chantier</h2>
-          <p className="text-gray-400">Vérification de votre accès...</p>
         </div>
-      </div>
+        {globalAlerts}
+      </>
     );
   }
 
@@ -141,6 +145,7 @@ function App() {
         />
         <PWAPrompt />
         <UpdatePrompt />
+        {globalAlerts}
       </>
     );
   }
@@ -152,6 +157,7 @@ function App() {
         userProfile={userProfile}
         onLogout={logout}
       />
+      {globalAlerts}
     </ChantierProvider>
   );
 }

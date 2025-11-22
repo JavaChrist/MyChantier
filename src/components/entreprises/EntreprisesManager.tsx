@@ -10,6 +10,7 @@ import { EntrepriseForm } from './EntrepriseForm';
 import { DevisManager } from './DevisManager';
 import { CommandesManager } from './CommandesManager';
 import { PaiementsManager } from './PaiementsManager';
+import { useAlertModal } from '../AlertModal';
 
 // Couleurs par secteur d'activité
 const COULEURS_SECTEURS = {
@@ -33,7 +34,8 @@ export function EntreprisesManager() {
   const [showPaiements, setShowPaiements] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [entrepriseToDelete, setEntrepriseToDelete] = useState<Entreprise | null>(null);
-  
+  const { showAlert, AlertModalComponent } = useAlertModal();
+
   // Fonction pour compter les éléments par entreprise
   const getEntrepriseStats = (entrepriseId: string) => {
     return {
@@ -74,7 +76,7 @@ export function EntreprisesManager() {
   const handleSaveEntreprise = async (entrepriseData: Omit<Entreprise, 'id' | 'dateCreation'>) => {
     try {
       if (!chantierId) {
-        alert('Aucun chantier sélectionné');
+        showAlert('Aucun chantier sélectionné', 'Veuillez choisir un chantier avant de gérer les entreprises.', 'warning');
         return;
       }
 
@@ -99,7 +101,7 @@ export function EntreprisesManager() {
       setIsModalOpen(false);
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
-      alert('Erreur lors de la sauvegarde. Vérifiez votre configuration Firebase.');
+      showAlert('Erreur', 'Erreur lors de la sauvegarde. Vérifiez votre configuration Firebase.', 'error');
     }
   };
 
@@ -113,18 +115,18 @@ export function EntreprisesManager() {
 
     try {
       console.log(`🗑️ Suppression entreprise ${entrepriseToDelete.nom} (${entrepriseToDelete.id}) du chantier ${chantierId}`);
-      
+
       // Utiliser la bonne fonction pour la structure V2
       await entreprisesService.deleteInChantier(chantierId, entrepriseToDelete.id!);
-      
+
       console.log('✅ Entreprise supprimée de Firebase');
       await reloadData();
-      
+
       setShowDeleteConfirm(false);
       setEntrepriseToDelete(null);
     } catch (error) {
       console.error('Erreur lors de la suppression:', error);
-      alert('❌ Erreur lors de la suppression de l\'entreprise.');
+      showAlert('Erreur', 'Erreur lors de la suppression de l\'entreprise.', 'error');
     }
   };
 
@@ -156,9 +158,12 @@ export function EntreprisesManager() {
 
   if (loading) {
     return (
-      <div className="mobile-padding flex items-center justify-center min-h-64">
-        <div className="text-gray-400">Chargement des entreprises...</div>
-      </div>
+      <>
+        <div className="mobile-padding flex items-center justify-center min-h-64">
+          <div className="text-gray-400">Chargement des entreprises...</div>
+        </div>
+        <AlertModalComponent />
+      </>
     );
   }
 
@@ -294,13 +299,13 @@ export function EntreprisesManager() {
 
               {/* Actions rapides */}
               <div className="mt-4 pt-4 border-t border-gray-700">
-                <div className="flex space-x-2">
+                <div className="flex flex-wrap gap-2">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       setShowDevis(entreprise.id || null);
                     }}
-                    className="flex-1 flex flex-col items-center justify-center px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded text-xs text-white transition-colors relative"
+                    className="grow basis-[150px] shrink-0 flex flex-col items-center justify-center px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded text-xs text-white transition-colors relative"
                   >
                     <div className="flex items-center space-x-1">
                       <FileText className="w-3 h-3" />
@@ -320,7 +325,7 @@ export function EntreprisesManager() {
                       e.stopPropagation();
                       setShowCommandes(entreprise.id || null);
                     }}
-                    className="flex-1 flex flex-col items-center justify-center px-3 py-2 bg-green-600 hover:bg-green-700 rounded text-xs text-white transition-colors relative"
+                    className="grow basis-[150px] shrink-0 flex flex-col items-center justify-center px-3 py-2 bg-green-600 hover:bg-green-700 rounded text-xs text-white transition-colors relative"
                   >
                     <div className="flex items-center space-x-1">
                       <ShoppingCart className="w-3 h-3" />
@@ -340,7 +345,7 @@ export function EntreprisesManager() {
                       e.stopPropagation();
                       setShowPaiements(entreprise.id || null);
                     }}
-                    className="flex-1 flex flex-col items-center justify-center px-3 py-2 bg-yellow-600 hover:bg-yellow-700 rounded text-xs text-white transition-colors relative"
+                    className="grow basis-[150px] shrink-0 flex flex-col items-center justify-center px-3 py-2 bg-yellow-600 hover:bg-yellow-700 rounded text-xs text-white transition-colors relative"
                   >
                     <div className="flex items-center space-x-1">
                       <CreditCard className="w-3 h-3" />
@@ -466,6 +471,7 @@ export function EntreprisesManager() {
         cancelText="Annuler"
         type="danger"
       />
+      <AlertModalComponent />
     </div>
   );
 }

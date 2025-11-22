@@ -4,6 +4,7 @@ import { unifiedPaiementsService, unifiedCommandesService, unifiedDevisService }
 import type { Paiement, Commande, Devis } from '../../firebase/unified-services';
 import { ConfirmModal } from '../ConfirmModal';
 import { Modal } from '../Modal';
+import { useAlertModal } from '../AlertModal';
 
 interface PaiementsManagerProps {
   entrepriseId: string;
@@ -22,6 +23,7 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
   const [paiementToUpdate, setPaiementToUpdate] = useState<Paiement | null>(null);
   const [showCustomPaiementsModal, setShowCustomPaiementsModal] = useState(false);
   const [selectedDevisForPaiements, setSelectedDevisForPaiements] = useState<{ devis: Devis, commande: any } | null>(null);
+  const { showAlert, AlertModalComponent } = useAlertModal();
 
   useEffect(() => {
     loadData();
@@ -79,7 +81,7 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
       console.log('📋 Devis trouvés:', tousDevis.length, 'dont validés:', devisValides.length);
 
       if (devisValides.length === 0) {
-        alert('Aucun devis validé trouvé pour cette entreprise.');
+        showAlert('Aucun devis validé', 'Aucun devis validé trouvé pour cette entreprise.', 'warning');
         return;
       }
 
@@ -99,7 +101,7 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
 
         const indexChoisi = parseInt(choix) - 1;
         if (isNaN(indexChoisi) || indexChoisi < 0 || indexChoisi >= devisValides.length) {
-          alert('Sélection invalide.');
+          showAlert('Sélection invalide', 'Veuillez sélectionner un devis valide dans la liste.', 'error');
           return;
         }
 
@@ -117,7 +119,11 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
         );
 
         if (creerCommande) {
-          alert('Veuillez d\'abord créer une commande dans l\'onglet "Commandes", puis revenir ici pour générer l\'échéancier.');
+          showAlert(
+            'Commande requise',
+            'Veuillez d\'abord créer une commande dans l\'onglet "Commandes", puis revenir ici pour générer l\'échéancier.',
+            'warning'
+          );
         }
         return;
       }
@@ -139,7 +145,7 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
       setShowCustomPaiementsModal(true);
     } catch (error) {
       console.error('Erreur lors de la préparation de l\'échéancier:', error);
-      alert('Erreur lors de la préparation de l\'échéancier de paiement.');
+      showAlert('Erreur', 'Erreur lors de la préparation de l\'échéancier de paiement.', 'error');
     }
   };
 
@@ -169,8 +175,7 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
       setShowForm(false);
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
-      // TODO: Remplacer par une modale d'erreur
-      alert('Erreur lors de la sauvegarde du paiement.');
+      showAlert('Erreur', 'Erreur lors de la sauvegarde du paiement.', 'error');
     }
   };
 
@@ -192,8 +197,7 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
         setPaiementToUpdate(null);
       } catch (error) {
         console.error('Erreur lors de la mise à jour:', error);
-        // TODO: Remplacer par une modale d'erreur
-        alert('Erreur lors de la mise à jour du paiement.');
+        showAlert('Erreur', 'Erreur lors de la mise à jour du paiement.', 'error');
       }
     }
   };
@@ -215,10 +219,10 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
       await loadData();
       setShowCustomPaiementsModal(false);
       setSelectedDevisForPaiements(null);
-      alert('✅ Échéancier de paiement créé avec succès !');
+      showAlert('Succès', 'Échéancier de paiement créé avec succès.', 'success');
     } catch (error) {
       console.error('Erreur création échéancier:', error);
-      alert('Erreur lors de la création de l\'échéancier de paiement.');
+      showAlert('Erreur', 'Erreur lors de la création de l\'échéancier de paiement.', 'error');
     }
   };
 
@@ -298,20 +302,26 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <div className="text-gray-400">Chargement des paiements...</div>
-      </div>
+      <>
+        <div className="flex items-center justify-center py-8">
+          <div className="text-gray-400">Chargement des paiements...</div>
+        </div>
+        <AlertModalComponent />
+      </>
     );
   }
 
   if (showForm) {
     return (
-      <PaiementForm
-        paiement={selectedPaiement}
-        commandes={commandes}
-        onSave={handleSavePaiement}
-        onCancel={() => setShowForm(false)}
-      />
+      <>
+        <PaiementForm
+          paiement={selectedPaiement}
+          commandes={commandes}
+          onSave={handleSavePaiement}
+          onCancel={() => setShowForm(false)}
+        />
+        <AlertModalComponent />
+      </>
     );
   }
 
@@ -343,7 +353,7 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
       </div>
 
       {/* Résumé des totaux */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="card-mobile">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-blue-600 rounded-lg">
@@ -446,7 +456,7 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mb-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mb-3">
                 <div>
                   <span className="text-gray-400">Date prévue:</span>
                   <p className="text-gray-100">{paiement.datePrevue.toLocaleDateString()}</p>
@@ -458,7 +468,7 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
                   </div>
                 )}
                 {paiement.notes && (
-                  <div className="md:col-span-2">
+                  <div className="sm:col-span-2">
                     <span className="text-gray-400">Notes:</span>
                     <p className="text-gray-100">{paiement.notes}</p>
                   </div>
@@ -534,9 +544,11 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
               setShowCustomPaiementsModal(false);
               setSelectedDevisForPaiements(null);
             }}
+            showAlert={showAlert}
           />
         )}
       </Modal>
+      <AlertModalComponent />
     </div>
   );
 }
@@ -774,12 +786,14 @@ function CustomPaiementsForm({
   devis,
   commande,
   onSave,
-  onCancel
+  onCancel,
+  showAlert
 }: {
   devis: Devis;
   commande: any;
   onSave: (paiements: Array<Omit<Paiement, 'id' | 'entrepriseId'>>) => void;
   onCancel: () => void;
+  showAlert: (title: string, message: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
 }) {
   const [paiements, setPaiements] = useState([
     {
@@ -808,7 +822,11 @@ function CustomPaiementsForm({
     // Validation
     const totalSaisi = paiements.reduce((sum, p) => sum + (parseFloat(p.montant) || 0), 0);
     if (Math.abs(totalSaisi - devis.montantTTC) > 0.01) {
-      alert(`⚠️ Erreur de montant !\n\nTotal saisi: ${totalSaisi.toLocaleString()} €\nMontant du devis: ${devis.montantTTC.toLocaleString()} €\n\nLe total des paiements doit correspondre au montant du devis.`);
+      showAlert(
+        'Erreur de montant',
+        `⚠️ Erreur de montant !\n\nTotal saisi: ${totalSaisi.toLocaleString()} €\nMontant du devis: ${devis.montantTTC.toLocaleString()} €\n\nLe total des paiements doit correspondre au montant du devis.`,
+        'warning'
+      );
       return;
     }
 
@@ -816,7 +834,7 @@ function CustomPaiementsForm({
     for (let i = 0; i < paiements.length; i++) {
       const p = paiements[i];
       if (!p.montant || !p.datePrevue || parseFloat(p.montant) <= 0) {
-        alert(`⚠️ Veuillez remplir correctement le paiement ${i + 1} (${p.type})`);
+        showAlert('Champs incomplets', `⚠️ Veuillez remplir correctement le paiement ${i + 1} (${p.type}).`, 'warning');
         return;
       }
     }
@@ -851,7 +869,7 @@ function CustomPaiementsForm({
 
   const handleRemovePaiement = (index: number) => {
     if (paiements.length <= 1) {
-      alert('Il faut au moins un paiement.');
+      showAlert('Action impossible', 'Il faut au moins un paiement.', 'warning');
       return;
     }
     setPaiements(prev => prev.filter((_, i) => i !== index));

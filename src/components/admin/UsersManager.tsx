@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Users, Edit2, Save, X, AlertCircle, Trash2 } from 'lucide-react';
 import { authService, type UserProfile } from '../../firebase/auth';
 import { chantierService } from '../../firebase/chantiers';
+import { useAlertModal } from '../AlertModal';
 
 export function UsersManager() {
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -9,6 +10,7 @@ export function UsersManager() {
   const [loading, setLoading] = useState(true);
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<{ chantierId?: string; role: 'client' | 'professional' }>({ role: 'client' });
+  const { showAlert, AlertModalComponent } = useAlertModal();
 
   useEffect(() => {
     loadData();
@@ -47,10 +49,10 @@ export function UsersManager() {
       await authService.updateUserProfile(uid, editForm);
       setEditingUser(null);
       await loadData(); // Recharger les données
-      alert('Utilisateur mis à jour avec succès !');
+      showAlert('Utilisateur mis à jour', 'Utilisateur mis à jour avec succès.', 'success');
     } catch (error) {
       console.error('Erreur mise à jour utilisateur:', error);
-      alert('Erreur lors de la mise à jour');
+      showAlert('Erreur', 'Erreur lors de la mise à jour.', 'error');
     }
   };
 
@@ -73,25 +75,32 @@ export function UsersManager() {
           await deleteDoc(doc(db, 'users', user.uid));
           console.log('✅ Utilisateur supprimé de Firestore:', user.uid);
           await loadData();
-          alert('✅ Utilisateur supprimé avec succès de Firestore !');
+          showAlert('Utilisateur supprimé', 'Utilisateur supprimé avec succès de Firestore.', 'success');
         } catch (error) {
           console.error('Erreur suppression utilisateur:', error);
-          alert('❌ Erreur lors de la suppression');
+          showAlert('Erreur', 'Erreur lors de la suppression.', 'error');
         }
       }
     } else {
-      alert('❌ Impossible de supprimer un professionnel depuis cette interface.\n\nUtilisez la console Firebase si nécessaire.');
+      showAlert(
+        'Action non autorisée',
+        'Impossible de supprimer un professionnel depuis cette interface.\n\nUtilisez la console Firebase si nécessaire.',
+        'warning'
+      );
     }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <div className="w-12 h-12 border-2 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-400">Chargement des utilisateurs...</p>
+      <>
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="w-12 h-12 border-2 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-gray-400">Chargement des utilisateurs...</p>
+          </div>
         </div>
-      </div>
+        <AlertModalComponent />
+      </>
     );
   }
 
@@ -387,6 +396,7 @@ export function UsersManager() {
           </table>
         </div>
       </div>
+      <AlertModalComponent />
     </div>
   );
 }

@@ -11,7 +11,7 @@ interface ChantierHeaderProps {
 }
 
 export function ChantierHeader({ userProfile, onLogout, onNavigate }: ChantierHeaderProps) {
-  const { chantierActuel, setChantierActuel, setChangtierId } = useChantier();
+  const { chantierActuel, setChantierActuel, setChangtierId, budgetActuel } = useChantier();
   const [showSwitchMenu, setShowSwitchMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   
@@ -123,12 +123,12 @@ export function ChantierHeader({ userProfile, onLogout, onNavigate }: ChantierHe
         </div>
       </div>
 
-      {chantierActuel.budget && (
+      {(budgetActuel ?? chantierActuel.budget) && (
         <div className="mt-3 pt-3 border-t border-primary-500/50">
           <div className="flex items-center justify-between text-sm">
             <span className="text-blue-100">Budget :</span>
             <span className="font-semibold text-white">
-              {chantierActuel.budget.toLocaleString()} €
+              {(budgetActuel ?? chantierActuel.budget ?? 0).toLocaleString()} €
             </span>
           </div>
         </div>

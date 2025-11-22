@@ -64,13 +64,13 @@ export function PrestationsManager() {
         const entreprise = entreprises.find(e => e.id === devisItem.entrepriseId);
         if (!entreprise) return;
 
-        const prestationKey = `${devisItem.prestationNom}-${entreprise.secteurActivite}`;
+        const prestationKey = `${entreprise.id}-${entreprise.secteurActivite}`;
 
         if (!prestationsMap.has(prestationKey)) {
           prestationsMap.set(prestationKey, {
             id: prestationKey,
-            nom: devisItem.prestationNom,
-            description: devisItem.description || '',
+            nom: entreprise.nom,
+            description: devisItem.description || devisItem.prestationNom || '',
             secteur: entreprise.secteurActivite,
             entreprises: [entreprise],
             statut: 'en-cours',
@@ -81,24 +81,24 @@ export function PrestationsManager() {
         } else {
           const prestation = prestationsMap.get(prestationKey)!;
           prestation.devis.push(devisItem);
-          if (!prestation.entreprises.some(e => e.id === entreprise.id)) {
-            prestation.entreprises.push(entreprise);
+          if (devisItem.dateRemise < prestation.dateCreation) {
+            prestation.dateCreation = devisItem.dateRemise;
+          }
+          if (!prestation.description && devisItem.description) {
+            prestation.description = devisItem.description;
           }
         }
       });
 
       // Ajouter les commandes aux prestations correspondantes
       commandes.forEach(commande => {
-        const devisOriginal = devis.find(d => d.id === commande.devisId);
-        if (devisOriginal) {
-          const entreprise = entreprises.find(e => e.id === commande.entrepriseId);
-          if (entreprise) {
-            const prestationKey = `${devisOriginal.prestationNom}-${entreprise.secteurActivite}`;
-            const prestation = prestationsMap.get(prestationKey);
-            if (prestation) {
-              prestation.commandes.push(commande);
-            }
-          }
+        const entreprise = entreprises.find(e => e.id === commande.entrepriseId);
+        if (!entreprise) return;
+
+        const prestationKey = `${entreprise.id}-${entreprise.secteurActivite}`;
+        const prestation = prestationsMap.get(prestationKey);
+        if (prestation) {
+          prestation.commandes.push(commande);
         }
       });
 
@@ -117,21 +117,19 @@ export function PrestationsManager() {
 
   // Calculer le statut d'une prestation basé sur ses devis et commandes
   const calculatePrestationStatus = (devis: Devis[], commandes: Commande[]): PrestationWithStatus['statut'] => {
-    if (commandes.length === 0) {
-      // Pas de commandes
-      const hasDevis = devis.length > 0;
-      const hasDevisValides = devis.some(d => d.statut === 'valide');
+    const devisValides = devis.filter(d => d.statut === 'valide');
+    const commandesLiees = commandes.filter(c => devis.some(d => d.id === c.devisId));
 
-      if (!hasDevis) return 'en-cours';
-      if (hasDevisValides) return 'devis-recus';
-      return 'devis-recus';
+    if (commandesLiees.length === 0) {
+      if (devisValides.length > 0) return 'devis-recus';
+      return devis.length > 0 ? 'devis-recus' : 'en-cours';
     }
 
     // Il y a des commandes
-    const commandesTerminees = commandes.filter(c => c.statut === 'terminee');
-    const commandesActives = commandes.filter(c => ['commandee', 'en-cours'].includes(c.statut));
+    const commandesTerminees = commandesLiees.filter(c => c.statut === 'terminee');
+    const commandesActives = commandesLiees.filter(c => ['commandee', 'en-cours'].includes(c.statut));
 
-    if (commandesTerminees.length === commandes.length) {
+    if (commandesTerminees.length === commandesLiees.length) {
       return 'termine';
     }
 

@@ -6,6 +6,7 @@ import { useChantier } from '../../contexts/ChantierContext';
 import { useChantierData } from '../../hooks/useChantierData';
 import { Modal } from '../Modal';
 import { ConfirmModal } from '../ConfirmModal';
+import { useAlertModal } from '../AlertModal';
 
 export function AssurancesManager() {
   const { chantierId, chantierActuel } = useChantier();
@@ -19,6 +20,7 @@ export function AssurancesManager() {
   const [selectedDocument, setSelectedDocument] = useState<DocumentOfficiel | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<{ entrepriseId: string; documentId: string } | null>(null);
+  const { showAlert, AlertModalComponent } = useAlertModal();
 
   const typesDocuments = [
     { value: 'all', label: 'Tous les types' },
@@ -95,7 +97,7 @@ export function AssurancesManager() {
   const handleSaveDocument = async (documentData: Omit<DocumentOfficiel, 'id'>, file: File) => {
     try {
       if (!chantierId) {
-        alert('Aucun chantier sélectionné');
+        showAlert('Aucun chantier', 'Aucun chantier sélectionné.', 'warning');
         return;
       }
 
@@ -129,7 +131,7 @@ export function AssurancesManager() {
       setShowDocumentModal(false);
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
-      alert(`Erreur lors de la sauvegarde: ${(error as any).message}`);
+      showAlert('Erreur', `Erreur lors de la sauvegarde: ${(error as any).message}`, 'error');
     }
   };
 
@@ -148,7 +150,7 @@ export function AssurancesManager() {
         setDocumentToDelete(null);
       } catch (error) {
         console.error('Erreur lors de la suppression:', error);
-        alert('Erreur lors de la suppression du document');
+        showAlert('Erreur', 'Erreur lors de la suppression du document.', 'error');
       }
     }
   };
@@ -213,11 +215,14 @@ export function AssurancesManager() {
 
   if (dataLoading) {
     return (
-      <div className="mobile-padding flex items-center justify-center min-h-64">
-        <div className="text-gray-400">
-          Chargement des documents {chantierActuel ? `du chantier "${chantierActuel.nom}"` : ''}...
+      <>
+        <div className="mobile-padding flex items-center justify-center min-h-64">
+          <div className="text-gray-400">
+            Chargement des documents {chantierActuel ? `du chantier "${chantierActuel.nom}"` : ''}...
+          </div>
         </div>
-      </div>
+        <AlertModalComponent />
+      </>
     );
   }
 
@@ -471,6 +476,7 @@ export function AssurancesManager() {
           entreprises={entreprises}
           onSave={handleSaveDocument}
           onCancel={() => setShowDocumentModal(false)}
+          showAlert={showAlert}
         />
       </Modal>
 
@@ -488,6 +494,7 @@ export function AssurancesManager() {
         cancelText="Annuler"
         type="danger"
       />
+      <AlertModalComponent />
     </div>
   );
 }
@@ -497,12 +504,14 @@ function DocumentForm({
   document,
   entreprises,
   onSave,
-  onCancel
+  onCancel,
+  showAlert
 }: {
   document: DocumentOfficiel | null;
   entreprises: any[];
   onSave: (document: Omit<DocumentOfficiel, 'id'>, file: File) => void;
   onCancel: () => void;
+  showAlert: (title: string, message: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
 }) {
   const [formData, setFormData] = useState({
     entrepriseId: '',
@@ -529,7 +538,7 @@ function DocumentForm({
     e.preventDefault();
 
     if (!selectedFile && !document) {
-      alert('Veuillez sélectionner un fichier.');
+      showAlert('Fichier requis', 'Veuillez sélectionner un fichier.', 'warning');
       return;
     }
 
@@ -568,12 +577,12 @@ function DocumentForm({
       ];
 
       if (!allowedTypes.includes(file.type)) {
-        alert('Type de fichier non autorisé. Utilisez PDF, Word ou Images.');
+        showAlert('Format non pris en charge', 'Type de fichier non autorisé. Utilisez PDF, Word ou Images.', 'warning');
         return;
       }
 
       if (file.size > 15 * 1024 * 1024) {
-        alert('Le fichier est trop volumineux (max 15MB).');
+        showAlert('Fichier trop volumineux', 'Le fichier est trop volumineux (max 15MB).', 'warning');
         return;
       }
 

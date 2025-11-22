@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CreditCard, CheckCircle, Clock, AlertCircle, Upload, X, Building2 } from 'lucide-react';
 import { Modal } from '../Modal';
+import { useAlertModal } from '../AlertModal';
 
 interface ClientPaiementsProps {
   paiements: any[];
@@ -11,6 +12,7 @@ export function ClientPaiements({ paiements, entreprises }: ClientPaiementsProps
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [selectedPaiement, setSelectedPaiement] = useState<any>(null);
   const [justificatif, setJustificatif] = useState<File | null>(null);
+  const { showAlert, AlertModalComponent } = useAlertModal();
 
   const getStatutColor = (statut: string, datePrevue: Date) => {
     const maintenant = new Date();
@@ -57,14 +59,14 @@ export function ClientPaiements({ paiements, entreprises }: ClientPaiementsProps
     setJustificatif(null);
 
     // Simulation de mise à jour
-    alert('Paiement validé ! Votre professionnel sera notifié.');
+    showAlert('Paiement validé', 'Paiement validé ! Votre professionnel sera notifié.', 'success');
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert('Fichier trop volumineux (max 5MB)');
+        showAlert('Fichier trop volumineux', 'Fichier trop volumineux (max 5MB).', 'warning');
         return;
       }
       setJustificatif(file);
@@ -329,6 +331,7 @@ export function ClientPaiements({ paiements, entreprises }: ClientPaiementsProps
           </div>
         </div>
       </Modal>
+      <AlertModalComponent />
     </div>
   );
 }
