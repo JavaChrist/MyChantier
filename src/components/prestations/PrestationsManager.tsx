@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Search, Users, Calendar, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import { Icon } from '../Icon';
 import type { Entreprise, Devis, Commande } from '../../firebase/unified-services';
@@ -148,6 +148,40 @@ export function PrestationsManager() {
     return matchesSearch && matchesSecteur && matchesStatut;
   });
 
+  const quickStats = useMemo(() => {
+    const enCoursCount = prestations.filter(p => p.statut === 'en-cours').length;
+    const devisRecusCount = devis.length;
+    const commandesActivesCount = commandes.filter(c => ['commandee', 'en-cours'].includes(c.statut)).length;
+    const commandesTermineesCount = commandes.filter(c => c.statut === 'terminee').length;
+
+    return [
+      {
+        key: 'en-cours',
+        label: 'En cours',
+        icon: <Clock className="w-4 h-4 text-yellow-400" />,
+        count: enCoursCount
+      },
+      {
+        key: 'devis-recus',
+        label: 'Devis reçus',
+        icon: <AlertCircle className="w-4 h-4 text-blue-400" />,
+        count: devisRecusCount
+      },
+      {
+        key: 'commandes-actives',
+        label: 'Commandes actives',
+        icon: <CheckCircle className="w-4 h-4 text-green-400" />,
+        count: commandesActivesCount
+      },
+      {
+        key: 'termine',
+        label: 'Terminé',
+        icon: <CheckCircle className="w-4 h-4 text-emerald-400" />,
+        count: commandesTermineesCount
+      }
+    ];
+  }, [prestations, devis, commandes]);
+
   const getSecteurLabel = (secteur: string) => {
     const secteurObj = secteurs.find(s => s.value === secteur);
     return secteurObj?.label || secteur;
@@ -246,20 +280,17 @@ export function PrestationsManager() {
 
       {/* Statistiques rapides */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {statuts.slice(1).map(statut => {
-          const count = prestations.filter(p => p.statut === statut.value).length;
-          return (
-            <div key={statut.value} className="card-mobile">
-              <div className="flex items-center space-x-2">
-                {getStatutIcon(statut.value)}
-                <div>
-                  <p className="text-xs text-gray-400">{statut.label}</p>
-                  <p className="text-lg font-bold text-gray-100">{count}</p>
-                </div>
+        {quickStats.map(stat => (
+          <div key={stat.key} className="card-mobile">
+            <div className="flex items-center space-x-2">
+              {stat.icon}
+              <div>
+                <p className="text-xs text-gray-400">{stat.label}</p>
+                <p className="text-lg font-bold text-gray-100">{stat.count}</p>
               </div>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
 
       {/* Liste des prestations */}
