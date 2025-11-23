@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, Eye, Play, CheckCircle, Check, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, Play, CheckCircle, Check, Trash2 } from 'lucide-react';
 import { Icon } from '../Icon';
 import { useChantier } from '../../contexts/ChantierContext';
 import { useChantierData } from '../../hooks/useChantierData';
@@ -9,6 +9,42 @@ import { ConfirmModal } from '../ConfirmModal';
 import { useAlertModal } from '../AlertModal';
 
 type ViewType = 'month' | 'week' | 'day' | 'agenda';
+type EntrepriseColor = { bg: string; text: string; border: string };
+type CalendarEvent = {
+  id: string;
+  type: 'commande-debut' | 'commande-fin' | 'rendez-vous';
+  title: string;
+  time?: string;
+  entrepriseId: string;
+  data: Commande | RendezVous;
+};
+type EventProvider = (date: Date) => CalendarEvent[];
+type EventClickHandler = (event: CalendarEvent) => void;
+
+interface MonthViewProps {
+  currentDate: Date;
+  getEventsForDate: EventProvider;
+  getEntrepriseCouleur: (id: string) => EntrepriseColor;
+  onDateClick: (date: Date) => void;
+  onEventClick: EventClickHandler;
+}
+
+interface WeekViewProps extends MonthViewProps { }
+
+interface DayViewProps extends MonthViewProps {
+  entreprises: Entreprise[];
+}
+
+interface AgendaViewProps {
+  rendezVous: RendezVous[];
+  commandes: Commande[];
+  entreprises: Entreprise[];
+  getEntrepriseCouleur: (id: string) => EntrepriseColor;
+  onEventClick: EventClickHandler;
+  onDateClick: (date: Date) => void;
+}
+
+const DEFAULT_ENTREPRISE_ID = '__sans-entreprise__';
 
 // Couleurs par secteur d'entreprise
 const COULEURS_SECTEURS = {
@@ -53,7 +89,10 @@ export function CalendarPlanning() {
     setCurrentDate(newDate);
   };
 
-  const getEntrepriseCouleur = (entrepriseId: string) => {
+  const getEntrepriseCouleur = (entrepriseId: string): EntrepriseColor => {
+    if (entrepriseId === DEFAULT_ENTREPRISE_ID) {
+      return COULEURS_SECTEURS.sanitaire;
+    }
     const entreprise = entreprises.find(e => e.id === entrepriseId);
     if (entreprise) {
       return COULEURS_SECTEURS[entreprise.secteurActivite] || COULEURS_SECTEURS.sanitaire;
@@ -69,15 +108,8 @@ export function CalendarPlanning() {
     return COULEURS_SECTEURS.sanitaire;
   };
 
-  const getEventsForDate = (date: Date) => {
-    const events: Array<{
-      id: string;
-      type: 'commande-debut' | 'commande-fin' | 'rendez-vous';
-      title: string;
-      time?: string;
-      entrepriseId: string;
-      data: Commande | RendezVous;
-    }> = [];
+  const getEventsForDate = (date: Date): CalendarEvent[] => {
+    const events: CalendarEvent[] = [];
 
     const dateStr = date.toDateString();
 
@@ -114,19 +146,27 @@ export function CalendarPlanning() {
 
     // Ajouter les rendez-vous (structure V2)
     rendezVous.forEach(rdv => {
-      // Gestion de la nouvelle structure (dateDebut/dateFin) et ancienne (dateHeure)
-      const rdvDate = rdv.dateDebut || rdv.dateHeure;
+      const legacyRdv = rdv as RendezVous & { dateHeure?: Date; confirme?: boolean; lieu?: string };
+      const rdvDate = rdv.dateDebut ?? legacyRdv.dateHeure ?? rdv.dateFin;
       if (rdvDate && rdvDate.toDateString() === dateStr) {
-        const statusIcon = rdv.statut === 'confirme' ? '✓ ' :
-          rdv.statut === 'termine' ? '✅ ' :
-            rdv.confirme ? '✓ ' : '⏳ ';
+        const normalizedRdv: RendezVous = {
+          ...rdv,
+          dateDebut: rdv.dateDebut ?? rdvDate,
+          dateFin: rdv.dateFin ?? rdvDate,
+          description: rdv.description ?? legacyRdv.lieu ?? '',
+          statut: rdv.statut ?? 'planifie'
+        };
+        const statusIcon = normalizedRdv.statut === 'confirme' ? '✓ ' :
+          normalizedRdv.statut === 'termine' ? '✅ ' :
+            legacyRdv.confirme ? '✓ ' : '⏳ ';
+        const entrepriseId = normalizedRdv.entrepriseId ?? DEFAULT_ENTREPRISE_ID;
         events.push({
-          id: `rdv-${rdv.id}`,
+          id: `rdv-${normalizedRdv.id}`,
           type: 'rendez-vous',
-          title: `${statusIcon}${rdv.titre}`,
+          title: `${statusIcon}${normalizedRdv.titre}`,
           time: rdvDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-          entrepriseId: rdv.entrepriseId,
-          data: rdv
+          entrepriseId,
+          data: normalizedRdv
         });
       }
     });
@@ -148,20 +188,18 @@ export function CalendarPlanning() {
     setShowEventModal(true);
   };
 
-  const handleEventClick = (event: any) => {
+  const handleEventClick = (event: CalendarEvent) => {
     try {
       if (event.type === 'rendez-vous' && event.data) {
         console.log('🔍 Clic sur rendez-vous:', event.data);
 
-        // Adapter la structure V2 pour la modale
-        const adaptedEvent = {
-          ...event.data,
-          // Assurer la compatibilité avec l'ancienne structure
-          dateHeure: event.data.dateDebut || event.data.dateHeure,
-          confirme: event.data.statut === 'confirme' || event.data.confirme || false
-        };
-
-        setSelectedEvent(adaptedEvent);
+        const rendezVousData = event.data as RendezVous;
+        setSelectedEvent({
+          ...rendezVousData,
+          dateDebut: rendezVousData.dateDebut || new Date(),
+          dateFin: rendezVousData.dateFin || rendezVousData.dateDebut || new Date(),
+          description: rendezVousData.description || ''
+        });
         setSelectedDate(null);
         setShowEventModal(true);
       }
@@ -388,9 +426,8 @@ function MonthView({
   getEntrepriseCouleur,
   onDateClick,
   onEventClick
-}: any) {
+}: MonthViewProps) {
   const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-  const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
   const startOfWeek = new Date(startOfMonth);
   startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay() + 1); // Lundi
 
@@ -474,7 +511,7 @@ function WeekView({
   getEntrepriseCouleur,
   onDateClick,
   onEventClick
-}: any) {
+}: WeekViewProps) {
   const startOfWeek = new Date(currentDate);
   startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay() + 1); // Lundi
 
@@ -542,7 +579,7 @@ function DayView({
   onDateClick,
   onEventClick,
   entreprises
-}: any) {
+}: DayViewProps) {
   const events = getEventsForDate(currentDate);
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
@@ -615,9 +652,9 @@ function DayView({
                       <span className="text-xs opacity-75">{entreprise?.nom}</span>
                     </div>
                     <div className="text-sm">{event.title}</div>
-                    {event.type === 'rendez-vous' && (
+                    {event.type === 'rendez-vous' && (event.data as RendezVous).description && (
                       <div className="text-xs mt-1 opacity-75">
-                        📍 {(event.data as RendezVous).lieu}
+                        📍 {(event.data as RendezVous).description}
                       </div>
                     )}
                   </div>
@@ -632,6 +669,18 @@ function DayView({
 }
 
 // Composant formulaire pour rendez-vous
+type RendezVousFormData = {
+  titre: string;
+  entrepriseId: string;
+  date: string;
+  heure: string;
+  lieu: string;
+  type: RendezVous['type'];
+  notes: string;
+  statut: RendezVous['statut'];
+  confirme: boolean;
+};
+
 function RendezVousForm({
   rendezVous,
   entreprises,
@@ -647,15 +696,15 @@ function RendezVousForm({
   onCancel: () => void;
   onDelete?: () => void;
 }) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<RendezVousFormData>({
     titre: '',
     entrepriseId: '',
     date: '',
     heure: '',
     lieu: '',
-    type: 'visite-chantier' as const,
+    type: 'reunion',
     notes: '',
-    statut: 'planifie' as const,
+    statut: 'planifie',
     confirme: false
   });
 
@@ -669,11 +718,11 @@ function RendezVousForm({
         entrepriseId: rendezVous.entrepriseId || '',
         date: rdvDate.toISOString().split('T')[0],
         heure: rdvDate.toTimeString().slice(0, 5),
-        lieu: rendezVous.description || '', // description en V2
+        lieu: rendezVous.description || '',
         type: rendezVous.type || 'reunion',
         notes: rendezVous.notes || '',
         statut: rendezVous.statut || 'planifie',
-        confirme: rendezVous.statut === 'confirme' || false
+        confirme: rendezVous.statut === 'confirme'
       });
     } else if (selectedDate) {
       setFormData(prev => ({
@@ -691,17 +740,17 @@ function RendezVousForm({
     const dateFin = new Date(dateDebut.getTime() + 60 * 60 * 1000); // +1 heure par défaut
 
     // Format V2 avec dateDebut et dateFin
+    const statut = formData.confirme ? 'confirme' : formData.statut;
     onSave({
       titre: formData.titre,
       description: formData.lieu, // Le "lieu" devient la description en V2
-      entrepriseId: formData.entrepriseId,
+      entrepriseId: formData.entrepriseId || undefined,
       dateDebut,
       dateFin,
       type: formData.type,
       notes: formData.notes,
-      statut: formData.statut,
-      confirme: formData.confirme
-    } as any);
+      statut
+    });
   };
 
   return (
@@ -802,12 +851,12 @@ function RendezVousForm({
             </label>
             <select
               value={formData.type}
-              onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as any }))}
+              onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as RendezVous['type'] }))}
               className="input-field w-full"
             >
-              <option value="visite-chantier">Visite de chantier</option>
-              <option value="remise-devis">Remise de devis</option>
               <option value="reunion">Réunion</option>
+              <option value="livraison">Livraison</option>
+              <option value="intervention">Intervention</option>
               <option value="autre">Autre</option>
             </select>
           </div>
@@ -818,11 +867,12 @@ function RendezVousForm({
             </label>
             <select
               value={formData.statut}
-              onChange={(e) => setFormData(prev => ({ ...prev, statut: e.target.value as any }))}
+              onChange={(e) => setFormData(prev => ({ ...prev, statut: e.target.value as RendezVous['statut'] }))}
               className="input-field w-full"
             >
               <option value="planifie">Planifié</option>
-              <option value="realise">Réalisé</option>
+              <option value="confirme">Confirmé</option>
+              <option value="termine">Terminé</option>
               <option value="annule">Annulé</option>
             </select>
           </div>
@@ -916,7 +966,7 @@ function AgendaView({
   getEntrepriseCouleur,
   onEventClick,
   onDateClick
-}: any) {
+}: AgendaViewProps) {
   const [filterPeriod, setFilterPeriod] = useState('7'); // 7 jours par défaut
   const [filterEntreprise, setFilterEntreprise] = useState('all');
   const [filterType, setFilterType] = useState('all');
@@ -942,11 +992,12 @@ function AgendaView({
     endDate.setDate(endDate.getDate() + filterDays);
 
     // Ajouter les rendez-vous (format V2 : dateDebut)
-    rendezVous.forEach((rdv: any) => {
+    rendezVous.forEach((rdv: RendezVous) => {
       const rdvDate = rdv.dateDebut; // Format V2
       if (rdvDate && rdvDate >= now && rdvDate <= endDate) {
         const entreprise = entreprises.find((e: any) => e.id === rdv.entrepriseId);
-        if (filterEntreprise === 'all' || rdv.entrepriseId === filterEntreprise) {
+        const entrepriseId = rdv.entrepriseId ?? DEFAULT_ENTREPRISE_ID;
+        if (filterEntreprise === 'all' || entrepriseId === filterEntreprise) {
           if (filterType === 'all' || filterType === 'rendez-vous') {
             events.push({
               id: `rdv-${rdv.id}`,
@@ -954,7 +1005,7 @@ function AgendaView({
               date: rdvDate,
               title: rdv.titre,
               description: `${rdv.type || 'Rendez-vous'} ${rdv.description ? '- ' + rdv.description : ''}`,
-              entrepriseId: rdv.entrepriseId,
+              entrepriseId,
               entrepriseNom: entreprise?.nom || 'Entreprise inconnue',
               lieu: rdv.description || '',
               statut: rdv.statut || 'planifie',

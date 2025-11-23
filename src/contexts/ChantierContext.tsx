@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { Chantier } from '../firebase/chantiers';
+import { unifiedBudgetService } from '../firebase/unified-services';
 
 interface ChantierContextType {
   chantierId: string | null;
@@ -24,6 +25,34 @@ export function ChantierProvider({ children }: { children: React.ReactNode }) {
     } else {
       localStorage.removeItem('selectedChantierId');
     }
+  }, [chantierId]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchBudget = async () => {
+      if (!chantierId) {
+        if (isMounted) setBudgetActuel(null);
+        return;
+      }
+
+      try {
+        const budgets = await unifiedBudgetService.getByChantier(chantierId);
+        if (!isMounted) return;
+
+        const actif = budgets.find(b => b.statut === 'actif');
+        setBudgetActuel(actif ? actif.montantActuel : null);
+      } catch (error) {
+        console.error('Erreur chargement budget:', error);
+        if (isMounted) setBudgetActuel(null);
+      }
+    };
+
+    fetchBudget();
+
+    return () => {
+      isMounted = false;
+    };
   }, [chantierId]);
 
   // Charger le chantier sélectionné au démarrage

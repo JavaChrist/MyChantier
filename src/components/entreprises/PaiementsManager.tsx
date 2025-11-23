@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, CreditCard, Calendar, Euro, Check, X, AlertTriangle, Clock, DollarSign, FileText, Edit3 } from 'lucide-react';
+import { Plus, CreditCard, Check, X, AlertTriangle, Clock, DollarSign, FileText } from 'lucide-react';
 import { unifiedPaiementsService, unifiedCommandesService, unifiedDevisService } from '../../firebase/unified-services';
 import type { Paiement, Commande, Devis } from '../../firebase/unified-services';
 import { ConfirmModal } from '../ConfirmModal';
@@ -22,18 +22,47 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [paiementToUpdate, setPaiementToUpdate] = useState<Paiement | null>(null);
   const [showCustomPaiementsModal, setShowCustomPaiementsModal] = useState(false);
-  const [selectedDevisForPaiements, setSelectedDevisForPaiements] = useState<{ devis: Devis, commande: any } | null>(null);
+  const [selectedDevisForPaiements, setSelectedDevisForPaiements] = useState<{ devis: Devis; commande: Commande } | null>(null);
+  const [devisSelectionContext, setDevisSelectionContext] = useState<{
+    devisList: Devis[];
+    commandes: Commande[];
+    paiementsEntreprise: Paiement[];
+  } | null>(null);
+  const [selectedDevisId, setSelectedDevisId] = useState('');
+  const [commandeSelectionContext, setCommandeSelectionContext] = useState<{
+    devis: Devis;
+    commandes: Commande[];
+    paiementsEntreprise: Paiement[];
+  } | null>(null);
+  const [selectedCommandeId, setSelectedCommandeId] = useState('');
+  const [duplicateConfirmContext, setDuplicateConfirmContext] = useState<{
+    devis: Devis;
+    commande: Commande;
+    existingCount: number;
+  } | null>(null);
   const { showAlert, AlertModalComponent } = useAlertModal();
 
   useEffect(() => {
     loadData();
   }, [entrepriseId]);
 
+  useEffect(() => {
+    if (devisSelectionContext?.devisList.length) {
+      setSelectedDevisId(devisSelectionContext.devisList[0]?.id || '');
+    }
+  }, [devisSelectionContext]);
+
+  useEffect(() => {
+    if (commandeSelectionContext?.commandes.length) {
+      setSelectedCommandeId(commandeSelectionContext.commandes[0]?.id || '');
+    }
+  }, [commandeSelectionContext]);
+
   const loadData = async () => {
     try {
       setLoading(true);
       console.log(`🔍 Chargement paiements pour entreprise ${entrepriseId} dans chantier ${chantierId}`);
-      
+
       // Charger TOUS les paiements et commandes du chantier puis filtrer par entreprise
       const [allPaiements, allCommandes] = await Promise.all([
         unifiedPaiementsService.getByChantier(chantierId),
@@ -42,9 +71,9 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
 
       const paiementsEntreprise = allPaiements.filter(p => p.entrepriseId === entrepriseId);
       const commandesData = allCommandes.filter(c => c.entrepriseId === entrepriseId);
-      
+
       console.log(`✅ ${paiementsEntreprise.length} paiements chargés pour cette entreprise`);
-      
+
       setPaiements(paiementsEntreprise);
       // Filtrer seulement les commandes actives (pas annulées)
       const commandesActives = commandesData.filter(cmd => cmd.statut !== 'annulee');
@@ -59,6 +88,88 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
     }
   };
 
+  const openEcheancierModal = (devis: Devis, commande: Commande) => {
+    setSelectedDevisForPaiements({ devis, commande });
+    setShowCustomPaiementsModal(true);
+  };
+
+  const preparePaiementsForDevis = (
+    devisSelectionne: Devis,
+    commandesDisponibles: Commande[],
+    paiementsEntreprise: Paiement[]
+  ) => {
+    if (!devisSelectionne.id) {
+      showAlert('Devis introuvable', 'Impossible d\'identifier le devis sélectionné.', 'error');
+      return;
+    }
+
+    const commandeLiee = commandesDisponibles.find(c => c.devisId === devisSelectionne.id);
+
+    if (!commandeLiee) {
+      if (commandesDisponibles.length === 0) {
+        showAlert(
+          'Commande requise',
+          'Aucune commande n\'a été trouvée pour cette entreprise. Créez-en une dans l\'onglet "Commandes" avant de générer l\'échéancier.',
+          'warning'
+        );
+        return;
+      }
+
+      setCommandeSelectionContext({
+        devis: devisSelectionne,
+        commandes: commandesDisponibles,
+        paiementsEntreprise
+      });
+      return;
+    }
+
+    const paiementsExistants = paiementsEntreprise.filter(p => p.commandeId === commandeLiee.id);
+    if (paiementsExistants.length > 0) {
+      setDuplicateConfirmContext({
+        devis: devisSelectionne,
+        commande: commandeLiee,
+        existingCount: paiementsExistants.length
+      });
+      return;
+    }
+
+    openEcheancierModal(devisSelectionne, commandeLiee);
+  };
+
+  const handleConfirmDevisSelection = () => {
+    if (!devisSelectionContext) return;
+    const devisSelectionne = devisSelectionContext.devisList.find(devis => devis.id === selectedDevisId);
+    if (!devisSelectionne) {
+      showAlert('Sélection invalide', 'Veuillez sélectionner un devis valide.', 'warning');
+      return;
+    }
+
+    preparePaiementsForDevis(devisSelectionne, devisSelectionContext.commandes, devisSelectionContext.paiementsEntreprise);
+    setDevisSelectionContext(null);
+  };
+
+  const handleConfirmCommandeSelection = () => {
+    if (!commandeSelectionContext) return;
+    const commandeChoisie = commandeSelectionContext.commandes.find(cmd => cmd.id === selectedCommandeId);
+    if (!commandeChoisie) {
+      showAlert('Sélection invalide', 'Veuillez sélectionner une commande valide.', 'warning');
+      return;
+    }
+
+    const paiementsExistants = commandeSelectionContext.paiementsEntreprise.filter(p => p.commandeId === commandeChoisie.id);
+    if (paiementsExistants.length > 0) {
+      setDuplicateConfirmContext({
+        devis: commandeSelectionContext.devis,
+        commande: commandeChoisie,
+        existingCount: paiementsExistants.length
+      });
+    } else {
+      openEcheancierModal(commandeSelectionContext.devis, commandeChoisie);
+    }
+
+    setCommandeSelectionContext(null);
+  };
+
   const handleCreatePaiement = () => {
     setSelectedPaiement(null);
     setShowForm(true);
@@ -68,16 +179,22 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
     try {
       console.log('🚀 BOUTON CLIQUÉ - Recherche devis validés pour entreprise:', entrepriseId);
 
-      // Récupérer les devis et commandes de cette entreprise depuis V2
-      const [allDevis, allCommandes] = await Promise.all([
+      const [allDevis, allCommandes, allPaiements] = await Promise.all([
         unifiedDevisService.getByChantier(chantierId),
-        unifiedCommandesService.getByChantier(chantierId)
+        unifiedCommandesService.getByChantier(chantierId),
+        unifiedPaiementsService.getByChantier(chantierId)
       ]);
-      
-      const tousDevis = allDevis.filter(d => d.entrepriseId === entrepriseId);
-      const toutesCommandes = allCommandes.filter(c => c.entrepriseId === entrepriseId);
 
+      const tousDevis = allDevis.filter(d => d.entrepriseId === entrepriseId);
       const devisValides = tousDevis.filter(d => d.statut === 'valide');
+      const commandesEntreprise = allCommandes
+        .filter(c => c.entrepriseId === entrepriseId)
+        .filter(cmd => cmd.statut !== 'annulee');
+      const paiementsEntreprise = allPaiements.filter(p => p.entrepriseId === entrepriseId);
+
+      setPaiements(paiementsEntreprise);
+      setCommandes(commandesEntreprise);
+
       console.log('📋 Devis trouvés:', tousDevis.length, 'dont validés:', devisValides.length);
 
       if (devisValides.length === 0) {
@@ -85,64 +202,16 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
         return;
       }
 
-      // Sélectionner le devis
-      let devisSelectionne;
-      if (devisValides.length === 1) {
-        devisSelectionne = devisValides[0];
-      } else {
-        // Laisser choisir parmi les devis validés
-        const choixDevis = devisValides.map((devis, index) =>
-          `${index + 1}. ${devis.prestationNom} - ${devis.montantTTC.toLocaleString()} € TTC`
-        ).join('\n');
-
-        const choix = prompt(
-          `Plusieurs devis validés disponibles. Choisissez (1-${devisValides.length}) :\n\n${choixDevis}`
-        );
-
-        const indexChoisi = parseInt(choix) - 1;
-        if (isNaN(indexChoisi) || indexChoisi < 0 || indexChoisi >= devisValides.length) {
-          showAlert('Sélection invalide', 'Veuillez sélectionner un devis valide dans la liste.', 'error');
-          return;
-        }
-
-        devisSelectionne = devisValides[indexChoisi];
-      }
-
-      // Vérifier s'il existe une commande pour ce devis
-      const commandeExistante = toutesCommandes.find(c => c.devisId === devisSelectionne.id);
-
-      if (!commandeExistante) {
-        const creerCommande = window.confirm(
-          `⚠️ Aucune commande n'existe pour ce devis.\n\n` +
-          `Il faut d'abord créer une commande avant de pouvoir générer l'échéancier de paiement.\n\n` +
-          `Voulez-vous aller créer une commande pour "${devisSelectionne.prestationNom}" ?`
-        );
-
-        if (creerCommande) {
-          showAlert(
-            'Commande requise',
-            'Veuillez d\'abord créer une commande dans l\'onglet "Commandes", puis revenir ici pour générer l\'échéancier.',
-            'warning'
-          );
-        }
+      if (devisValides.length > 1) {
+        setDevisSelectionContext({
+          devisList: devisValides,
+          commandes: commandesEntreprise,
+          paiementsEntreprise
+        });
         return;
       }
 
-      // Vérifier si des paiements existent déjà pour cette commande
-      const paiementsExistants = paiements.filter(p => p.commandeId === commandeExistante.id);
-      console.log('🔍 Paiements existants pour cette commande:', paiementsExistants.length);
-
-      if (paiementsExistants.length > 0) {
-        const createAnyway = window.confirm(
-          `⚠️ Des paiements existent déjà pour "${devisSelectionne.prestationNom}" (${paiementsExistants.length} paiement(s)).\n\n` +
-          `Voulez-vous quand même créer un nouvel échéancier ?`
-        );
-        if (!createAnyway) return;
-      }
-
-      // Ouvrir le formulaire personnalisé
-      setSelectedDevisForPaiements({ devis: devisSelectionne, commande: commandeExistante });
-      setShowCustomPaiementsModal(true);
+      preparePaiementsForDevis(devisValides[0], commandesEntreprise, paiementsEntreprise);
     } catch (error) {
       console.error('Erreur lors de la préparation de l\'échéancier:', error);
       showAlert('Erreur', 'Erreur lors de la préparation de l\'échéancier de paiement.', 'error');
@@ -156,6 +225,29 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
 
   const handleSavePaiement = async (paiementData: Omit<Paiement, 'id' | 'entrepriseId'>) => {
     try {
+      if (!paiementData.commandeId) {
+        showAlert('Commande requise', 'Veuillez sélectionner une commande avant d\'enregistrer le paiement.', 'warning');
+        return;
+      }
+
+      if (!Number.isFinite(paiementData.montant) || paiementData.montant <= 0) {
+        showAlert('Montant invalide', 'Le montant doit être un nombre positif.', 'warning');
+        return;
+      }
+
+      if (!(paiementData.datePrevue instanceof Date) || isNaN(paiementData.datePrevue.getTime())) {
+        showAlert('Date prévue invalide', 'Merci de fournir une date prévue valide.', 'warning');
+        return;
+      }
+
+      if (
+        paiementData.dateReglement &&
+        (isNaN(paiementData.dateReglement.getTime()) || paiementData.dateReglement < paiementData.datePrevue)
+      ) {
+        showAlert('Date règlement invalide', 'La date de règlement ne peut pas être antérieure à la date prévue.', 'warning');
+        return;
+      }
+
       const fullPaiementData = {
         ...paiementData,
         entrepriseId: entrepriseId
@@ -173,9 +265,14 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
 
       await loadData();
       setShowForm(false);
+      showAlert('Succès', 'Paiement enregistré avec succès.', 'success');
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
-      showAlert('Erreur', 'Erreur lors de la sauvegarde du paiement.', 'error');
+      showAlert(
+        'Erreur',
+        `Erreur lors de la sauvegarde du paiement.\n\n${error instanceof Error ? error.message : 'Erreur inconnue'}`,
+        'error'
+      );
     }
   };
 
@@ -205,7 +302,7 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
   const handleSaveCustomPaiements = async (paiementsData: Array<Omit<Paiement, 'id' | 'entrepriseId'>>) => {
     try {
       console.log(`🏗️ Création échéancier de ${paiementsData.length} paiements dans chantier ${chantierId}`);
-      
+
       // Créer tous les paiements
       for (const paiement of paiementsData) {
         const fullPaiementData = {
@@ -548,12 +645,125 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
           />
         )}
       </Modal>
+      <Modal
+        isOpen={!!devisSelectionContext}
+        onClose={() => setDevisSelectionContext(null)}
+        title="Sélectionner un devis validé"
+        size="md"
+      >
+        {devisSelectionContext && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-300">
+              Plusieurs devis validés sont disponibles pour {entrepriseName}. Choisissez celui pour lequel générer l'échéancier.
+            </p>
+            <select
+              value={selectedDevisId}
+              onChange={(e) => setSelectedDevisId(e.target.value)}
+              className="input-field w-full"
+            >
+              {devisSelectionContext.devisList.map((devis) => (
+                <option key={devis.id} value={devis.id}>
+                  {(devis.numero || 'Sans numéro')} • {devis.prestationNom} ({devis.montantTTC.toLocaleString()} €)
+                </option>
+              ))}
+            </select>
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setDevisSelectionContext(null)}
+                className="btn-secondary"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDevisSelection}
+                className="btn-primary"
+                disabled={!selectedDevisId}
+              >
+                Continuer
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+      <Modal
+        isOpen={!!commandeSelectionContext}
+        onClose={() => setCommandeSelectionContext(null)}
+        title="Associer une commande"
+        size="md"
+      >
+        {commandeSelectionContext && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-300">
+              Aucune commande n'était liée à ce devis. Sélectionnez celle à utiliser pour l'échéancier de{' '}
+              <span className="font-semibold">{commandeSelectionContext.devis.prestationNom}</span>.
+            </p>
+            <select
+              value={selectedCommandeId}
+              onChange={(e) => setSelectedCommandeId(e.target.value)}
+              className="input-field w-full"
+            >
+              {commandeSelectionContext.commandes.map((commande) => (
+                <option key={commande.id} value={commande.id}>
+                  {commande.numero} • {commande.prestationNom} ({commande.montantTTC.toLocaleString()} €)
+                </option>
+              ))}
+            </select>
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setCommandeSelectionContext(null)}
+                className="btn-secondary"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCommandeSelection}
+                className="btn-primary"
+                disabled={!selectedCommandeId}
+              >
+                Continuer
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+      <ConfirmModal
+        isOpen={!!duplicateConfirmContext}
+        onConfirm={() => {
+          if (!duplicateConfirmContext) return;
+          openEcheancierModal(duplicateConfirmContext.devis, duplicateConfirmContext.commande);
+          setDuplicateConfirmContext(null);
+        }}
+        onCancel={() => setDuplicateConfirmContext(null)}
+        title="Paiements déjà existants"
+        message={
+          duplicateConfirmContext
+            ? `⚠️ ${duplicateConfirmContext.existingCount} paiement(s) existent déjà pour la commande ${duplicateConfirmContext.commande.numero}.\n\nVoulez-vous tout de même créer un nouvel échéancier ?`
+            : ''
+        }
+        confirmText="Créer quand même"
+        cancelText="Annuler"
+        type="warning"
+      />
       <AlertModalComponent />
     </div>
   );
 }
 
 // Composant formulaire pour créer/modifier un paiement
+type PaiementFormData = {
+  commandeId: string;
+  type: Paiement['type'];
+  montant: string;
+  datePrevue: string;
+  dateReglement: string;
+  statut: Paiement['statut'];
+  notes: string;
+};
+
 function PaiementForm({
   paiement,
   commandes,
@@ -565,13 +775,13 @@ function PaiementForm({
   onSave: (paiement: Omit<Paiement, 'id' | 'entrepriseId'>) => void;
   onCancel: () => void;
 }) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<PaiementFormData>({
     commandeId: '',
-    type: 'acompte' as const,
+    type: 'acompte',
     montant: '',
     datePrevue: '',
     dateReglement: '',
-    statut: 'prevu' as const,
+    statut: 'prevu',
     notes: ''
   });
 
@@ -672,7 +882,7 @@ function PaiementForm({
           <select
             required
             value={formData.type}
-            onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as any }))}
+            onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as Paiement['type'] }))}
             className="input-field w-full"
           >
             <option value="acompte">Acompte (30%)</option>
@@ -730,7 +940,7 @@ function PaiementForm({
           <select
             required
             value={formData.statut}
-            onChange={(e) => setFormData(prev => ({ ...prev, statut: e.target.value as any }))}
+            onChange={(e) => setFormData(prev => ({ ...prev, statut: e.target.value as Paiement['statut'] }))}
             className="input-field w-full"
           >
             <option value="prevu">Prévu</option>
@@ -790,7 +1000,7 @@ function CustomPaiementsForm({
   showAlert
 }: {
   devis: Devis;
-  commande: any;
+  commande: Commande;
   onSave: (paiements: Array<Omit<Paiement, 'id' | 'entrepriseId'>>) => void;
   onCancel: () => void;
   showAlert: (title: string, message: string, type?: 'success' | 'error' | 'warning' | 'info') => void;

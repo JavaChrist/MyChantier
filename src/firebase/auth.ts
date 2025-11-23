@@ -7,7 +7,7 @@ import {
   sendPasswordResetEmail,
   type User
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, collection, getDocs, query } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { auth, db } from './config';
 
 // Fonction pour trouver un chantier par email (principal, secondaire ou tertiaire)
@@ -16,17 +16,17 @@ async function trouverChantierParEmail(email: string): Promise<string | null> {
     console.log(`🔎 Recherche chantier pour email: "${email}"`);
     const chantiersSnapshot = await getDocs(collection(db, 'chantiers'));
     console.log(`📦 ${chantiersSnapshot.size} chantiers trouvés`);
-    
+
     for (const chantierDoc of chantiersSnapshot.docs) {
       const data = chantierDoc.data();
       const emailLower = email.toLowerCase().trim();
-      
+
       console.log(`  - Chantier "${data.nom}":`, {
         clientEmail: data.clientEmail,
         clientEmail2: data.clientEmail2,
         clientEmail3: data.clientEmail3
       });
-      
+
       if (
         data.clientEmail?.toLowerCase().trim() === emailLower ||
         data.clientEmail2?.toLowerCase().trim() === emailLower ||
@@ -36,7 +36,7 @@ async function trouverChantierParEmail(email: string): Promise<string | null> {
         return chantierDoc.id;
       }
     }
-    
+
     console.log(`❌ Aucun chantier trouvé pour email: ${email}`);
     return null;
   } catch (error) {
@@ -83,10 +83,10 @@ export const authService = {
       // Détecter si c'est un email client (chercher dans les chantiers)
       console.log('🔍 Vérification si email client:', email);
       const chantierTrouve = await trouverChantierParEmail(email);
-      
+
       let role: 'professional' | 'client' = 'professional';
       let chantierId: string | undefined = undefined;
-      
+
       if (chantierTrouve) {
         // C'est un email de client (principal, secondaire ou tertiaire)
         console.log(`✅ Email trouvé dans chantier: ${chantierTrouve}`);
@@ -210,11 +210,11 @@ export const authService = {
         // Déterminer le rôle intelligemment si non défini
         let userRole = data.role;
         const user = auth.currentUser;
-        
+
         if (!userRole) {
           userRole = (user?.email === 'contact@javachrist.fr') ? 'professional' : 'client';
           console.log('⚠️ Rôle non défini, détection automatique:', userRole);
-          
+
           // Sauvegarder le rôle corrigé dans Firestore
           await setDoc(doc(db, 'users', uid), { role: userRole }, { merge: true });
         }
@@ -225,7 +225,7 @@ export const authService = {
           // Chercher si cet email est un email secondaire/tertiaire d'un chantier
           console.log('🔍 Recherche chantier pour email secondaire:', user.email);
           const chantierTrouve = await trouverChantierParEmail(user.email);
-          
+
           if (chantierTrouve) {
             console.log(`✅ Chantier trouvé pour email secondaire: ${chantierTrouve}`);
             chantierId = chantierTrouve;
@@ -238,7 +238,7 @@ export const authService = {
 
         // Utiliser l'email de Firebase Auth si celui de Firestore est vide
         const userEmail = data.email || user?.email || '';
-        
+
         // Si l'email était vide dans Firestore, le corriger
         if (!data.email && user?.email) {
           console.log('🔧 Correction email manquant dans Firestore:', user.email);
@@ -351,15 +351,15 @@ export const authService = {
     try {
       const { collection, getDocs } = await import('firebase/firestore');
       const querySnapshot = await getDocs(collection(db, 'users'));
-      
+
       const users: UserProfile[] = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        
+
         // Gestion sécurisée des dates
         let dateCreation = new Date();
         let derniereConnexion = new Date();
-        
+
         try {
           if (data.dateCreation?.toDate) {
             dateCreation = data.dateCreation.toDate();
@@ -367,7 +367,7 @@ export const authService = {
         } catch (e) {
           console.warn('Erreur conversion dateCreation:', e);
         }
-        
+
         try {
           if (data.derniereConnexion?.toDate) {
             derniereConnexion = data.derniereConnexion.toDate();
@@ -375,7 +375,7 @@ export const authService = {
         } catch (e) {
           console.warn('Erreur conversion derniereConnexion:', e);
         }
-        
+
         users.push({
           uid: data.uid || doc.id,
           email: data.email || '',
@@ -386,7 +386,7 @@ export const authService = {
           derniereConnexion
         });
       });
-      
+
       console.log(`✅ ${users.length} utilisateurs chargés`);
       return users;
     } catch (error) {

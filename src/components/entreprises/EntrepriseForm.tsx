@@ -2,35 +2,41 @@ import React, { useState, useEffect } from 'react';
 import { Save, X } from 'lucide-react';
 import type { Entreprise } from '../../firebase/entreprises';
 
+type EntrepriseFormData = Omit<Entreprise, 'id' | 'dateCreation'>;
+
 interface EntrepriseFormProps {
+  chantierId: string;
   entreprise: Entreprise | null;
-  onSave: (entreprise: Omit<Entreprise, 'id' | 'dateCreation'>) => void;
+  onSave: (entreprise: EntrepriseFormData) => void;
   onCancel: () => void;
 }
 
-export function EntrepriseForm({ entreprise, onSave, onCancel }: EntrepriseFormProps) {
-  const [formData, setFormData] = useState({
+const getEmptyFormData = (chantierId: string): EntrepriseFormData => ({
+  nom: '',
+  siret: '',
+  secteurActivite: 'sanitaire',
+  contact: {
     nom: '',
-    siret: '',
-    secteurActivite: 'sanitaire' as const,
-    contact: {
-      nom: '',
-      telephone: '',
-      email: ''
-    },
-    adresse: {
-      rue: '',
-      ville: '',
-      codePostal: ''
-    },
-    rib: {
-      iban: '',
-      bic: '',
-      titulaire: '',
-      banque: ''
-    },
-    notes: ''
-  });
+    telephone: '',
+    email: ''
+  },
+  adresse: {
+    rue: '',
+    ville: '',
+    codePostal: ''
+  },
+  rib: {
+    iban: '',
+    bic: '',
+    titulaire: '',
+    banque: ''
+  },
+  notes: '',
+  chantierId
+});
+
+export function EntrepriseForm({ chantierId, entreprise, onSave, onCancel }: EntrepriseFormProps) {
+  const [formData, setFormData] = useState<EntrepriseFormData>(() => getEmptyFormData(chantierId));
 
   const secteurs = [
     { value: 'sanitaire', label: 'Sanitaire' },
@@ -54,10 +60,13 @@ export function EntrepriseForm({ entreprise, onSave, onCancel }: EntrepriseFormP
           titulaire: '',
           banque: ''
         },
-        notes: entreprise.notes || ''
+        notes: entreprise.notes || '',
+        chantierId: entreprise.chantierId
       });
+    } else {
+      setFormData(getEmptyFormData(chantierId));
     }
-  }, [entreprise]);
+  }, [entreprise, chantierId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,12 +74,20 @@ export function EntrepriseForm({ entreprise, onSave, onCancel }: EntrepriseFormP
   };
 
   const handleInputChange = (field: string, value: string) => {
+    if (field === 'secteurActivite') {
+      setFormData(prev => ({
+        ...prev,
+        secteurActivite: value as Entreprise['secteurActivite']
+      }));
+      return;
+    }
+
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
       setFormData(prev => ({
         ...prev,
         [parent]: {
-          ...prev[parent as keyof typeof prev] as any,
+          ...((prev[parent as keyof typeof prev] as Record<string, string>) ?? {}),
           [child]: value
         }
       }));
@@ -244,7 +261,7 @@ export function EntrepriseForm({ entreprise, onSave, onCancel }: EntrepriseFormP
               </label>
               <input
                 type="text"
-                value={formData.rib.iban}
+                value={formData.rib?.iban ?? ''}
                 onChange={(e) => handleInputChange('rib.iban', e.target.value.toUpperCase())}
                 className="input-field w-full font-mono"
                 placeholder="FR76 1234 5678 9012 3456 7890 123"
@@ -258,7 +275,7 @@ export function EntrepriseForm({ entreprise, onSave, onCancel }: EntrepriseFormP
               </label>
               <input
                 type="text"
-                value={formData.rib.bic}
+                value={formData.rib?.bic ?? ''}
                 onChange={(e) => handleInputChange('rib.bic', e.target.value.toUpperCase())}
                 className="input-field w-full font-mono"
                 placeholder="BNPAFRPP"
@@ -274,7 +291,7 @@ export function EntrepriseForm({ entreprise, onSave, onCancel }: EntrepriseFormP
               </label>
               <input
                 type="text"
-                value={formData.rib.titulaire}
+                value={formData.rib?.titulaire ?? ''}
                 onChange={(e) => handleInputChange('rib.titulaire', e.target.value)}
                 className="input-field w-full"
                 placeholder="Ex: SARL Plomberie Martin"
@@ -287,7 +304,7 @@ export function EntrepriseForm({ entreprise, onSave, onCancel }: EntrepriseFormP
               </label>
               <input
                 type="text"
-                value={formData.rib.banque}
+                value={formData.rib?.banque ?? ''}
                 onChange={(e) => handleInputChange('rib.banque', e.target.value)}
                 className="input-field w-full"
                 placeholder="Ex: BNP Paribas"

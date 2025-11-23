@@ -1,22 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { Wifi, WifiOff, CheckCircle, RefreshCw } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { WifiOff, CheckCircle } from 'lucide-react';
 
 export function UpdatePrompt() {
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [showOfflineNotice, setShowOfflineNotice] = useState(false);
   const [showUpdateSuccess, setShowUpdateSuccess] = useState(false);
-  const [firebaseConnected, setFirebaseConnected] = useState(true);
 
   useEffect(() => {
     // Test de connexion Firebase plus intelligent
     const testFirebaseConnection = async () => {
       try {
         // Simplement vérifier si on est en ligne
-        setFirebaseConnected(navigator.onLine);
-        setIsOnline(navigator.onLine);
+        const online = navigator.onLine;
+        if (!online) {
+          setShowOfflineNotice(true);
+          setTimeout(() => setShowOfflineNotice(false), 5000);
+        }
       } catch (error) {
         console.log('Erreur test connexion');
-        setFirebaseConnected(false);
       }
     };
 
@@ -25,8 +25,6 @@ export function UpdatePrompt() {
 
     // Gérer le statut en ligne/hors ligne
     const handleOnline = () => {
-      setIsOnline(true);
-      setFirebaseConnected(true);
       setShowUpdateSuccess(true);
       console.log('🌐 Connexion rétablie - Synchronisation en cours');
 
@@ -40,17 +38,16 @@ export function UpdatePrompt() {
       let checkCount = 0;
       const intervalId = setInterval(() => {
         checkCount++;
-        
+
         if (navigator.onLine) {
           // Retour en ligne, annuler
           clearInterval(intervalId);
           return;
         }
-        
+
         if (checkCount >= 5) {
           // Vraiment hors ligne après 5 vérifications (2.5 secondes)
           clearInterval(intervalId);
-          setIsOnline(false);
           setShowOfflineNotice(true);
           console.warn('📴 Mode hors ligne confirmé');
           setTimeout(() => setShowOfflineNotice(false), 5000);

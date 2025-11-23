@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, Smartphone, Wifi, WifiOff, X } from 'lucide-react';
+import { Download, Smartphone, WifiOff, X } from 'lucide-react';
 import { usePWA } from '../hooks/usePWA';
 
 export function PWAPrompt() {

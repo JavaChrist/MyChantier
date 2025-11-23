@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Trash2 } from 'lucide-react';
-import { unifiedMessagesService, type Message } from '../../firebase/unified-services';
+import { unifiedMessagesService } from '../../firebase/unified-services';
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { ConfirmModal } from '../ConfirmModal';
@@ -16,14 +16,14 @@ export function ClientChat({ chantierId, userProfile }: { chantierId: string; us
     loadMessagesForChantier(chantierId, false); // Ne pas marquer comme lu immédiatement
     setChatVisible(true);
   }, [chantierId]);
-  
+
   // Marquer comme lus après un délai
   useEffect(() => {
     if (chatVisible && chantierId) {
       const timer = setTimeout(() => {
         markMessagesAsRead(chantierId);
       }, 1000);
-      
+
       return () => clearTimeout(timer);
     }
   }, [chatVisible, chantierId]);
@@ -36,7 +36,7 @@ export function ClientChat({ chantierId, userProfile }: { chantierId: string; us
       setMessages(messagesData);
 
       console.log(`✅ Client: ${messagesData.length} messages chargés depuis Firebase V2`);
-      
+
       if (shouldMarkAsRead) {
         await markMessagesAsRead(chantierId);
       }
@@ -45,23 +45,23 @@ export function ClientChat({ chantierId, userProfile }: { chantierId: string; us
       setMessages([]);
     }
   };
-  
+
   const markMessagesAsRead = async (chantierId: string) => {
     try {
       const messagesData = await unifiedMessagesService.getByChantier(chantierId);
-      const unreadMessages = messagesData.filter(msg => 
+      const unreadMessages = messagesData.filter(msg =>
         !msg.isRead && msg.sender === 'professional'
       );
-      
+
       if (unreadMessages.length > 0) {
         const messageIds = unreadMessages.map(msg => msg.id!).filter(id => id);
         await unifiedMessagesService.markAsRead(chantierId, messageIds);
         console.log(`✅ Client: ${messageIds.length} messages marqués comme lus`);
-        
+
         // Recharger pour mettre à jour l'affichage
         const updatedMessages = await unifiedMessagesService.getByChantier(chantierId);
         setMessages(updatedMessages);
-        
+
         // Notifier pour mettre à jour le badge
         window.dispatchEvent(new Event('messages-updated'));
       }
@@ -90,7 +90,7 @@ export function ClientChat({ chantierId, userProfile }: { chantierId: string; us
 
       // Recharger les messages
       await loadMessagesForChantier(chantierId, false);
-      
+
       // Notifier les autres composants pour mettre à jour le badge
       window.dispatchEvent(new Event('messages-updated'));
     } catch (error) {
@@ -112,7 +112,7 @@ export function ClientChat({ chantierId, userProfile }: { chantierId: string; us
 
     try {
       console.log(`🗑️ Client: Purge de tous les messages du chantier ${chantierId}`);
-      
+
       const messagesSnapshot = await getDocs(collection(db, `chantiers/${chantierId}/messages`));
       console.log(`📦 ${messagesSnapshot.size} messages à supprimer`);
 
@@ -123,13 +123,13 @@ export function ClientChat({ chantierId, userProfile }: { chantierId: string; us
       }
 
       console.log(`✅ ${count} messages supprimés`);
-      
+
       // Recharger
       await loadMessagesForChantier(chantierId, false);
-      
+
       // Notifier
       window.dispatchEvent(new Event('messages-updated'));
-      
+
     } catch (error) {
       console.error('❌ Erreur purge messages:', error);
     }
@@ -210,7 +210,7 @@ export function ClientChat({ chantierId, userProfile }: { chantierId: string; us
           </button>
         </div>
       </div>
-      
+
       {/* Modal de confirmation de purge */}
       <ConfirmModal
         isOpen={showPurgeConfirm}

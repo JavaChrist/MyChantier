@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, CreditCard, Calendar, Euro, Check, X, AlertTriangle, Clock, DollarSign, TrendingUp, Edit2, Target } from 'lucide-react';
-import { entreprisesService, paiementsService } from '../../firebase/entreprises';
+import { CreditCard, Check, AlertTriangle, Clock, DollarSign, Edit2, Target } from 'lucide-react';
 import { unifiedBudgetService, unifiedPaiementsService, type BudgetPrevisionnel, type Paiement } from '../../firebase/unified-services';
 import { useChantier } from '../../contexts/ChantierContext';
 import { useChantierData } from '../../hooks/useChantierData';
-import type { Entreprise } from '../../firebase/entreprises';
 import { Modal } from '../Modal';
 import { ConfirmModal } from '../ConfirmModal';
 import { useAlertModal } from '../AlertModal';
@@ -141,15 +139,6 @@ export function PaiementsGlobaux() {
     const matchesType = filterType === 'all' || paiement.type === filterType;
     return matchesStatut && matchesEntreprise && matchesType;
   });
-
-  const getStatutColor = (statut: string, datePrevue: Date) => {
-    const maintenant = new Date();
-    const isEnRetard = statut === 'prevu' && datePrevue < maintenant;
-
-    if (statut === 'regle') return 'text-green-400';
-    if (isEnRetard) return 'text-red-400';
-    return 'text-yellow-400';
-  };
 
   const getStatutLabel = (statut: string, datePrevue: Date) => {
     const maintenant = new Date();
@@ -561,6 +550,16 @@ export function PaiementsGlobaux() {
   );
 }
 
+type BudgetFormState = {
+  nom: string;
+  description: string;
+  montantInitial: string;
+  montantActuel: string;
+  secteurs: Record<'sanitaire' | 'electricite' | 'carrelage' | 'menuiserie' | 'peinture', string>;
+  statut: BudgetPrevisionnel['statut'];
+  notes: string;
+};
+
 // Composant formulaire pour créer/modifier un budget
 function BudgetForm({
   budget,
@@ -571,7 +570,7 @@ function BudgetForm({
   onSave: (budget: Omit<BudgetPrevisionnel, 'id'>) => void;
   onCancel: () => void;
 }) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<BudgetFormState>({
     nom: '',
     description: '',
     montantInitial: '',
@@ -583,7 +582,7 @@ function BudgetForm({
       menuiserie: '',
       peinture: ''
     },
-    statut: 'actif' as const,
+    statut: 'actif',
     notes: ''
   });
 

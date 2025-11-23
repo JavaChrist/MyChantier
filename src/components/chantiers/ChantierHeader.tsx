@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ChevronDown, ArrowLeft, LogOut, User, MessageCircle } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeft, LogOut, User, MessageCircle } from 'lucide-react';
 import { AppIcon } from '../Icon';
 import { useChantier } from '../../contexts/ChantierContext';
 import { useUnreadMessages } from '../../hooks/useUnreadMessages';
@@ -12,9 +12,8 @@ interface ChantierHeaderProps {
 
 export function ChantierHeader({ userProfile, onLogout, onNavigate }: ChantierHeaderProps) {
   const { chantierActuel, setChantierActuel, setChangtierId, budgetActuel } = useChantier();
-  const [showSwitchMenu, setShowSwitchMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  
+
   // Compter les messages non lus
   const unreadCount = useUnreadMessages(
     chantierActuel?.id || null,
@@ -60,11 +59,11 @@ export function ChantierHeader({ userProfile, onLogout, onNavigate }: ChantierHe
               </span>
             </button>
           )}
-          
+
           <div className={`px-2 py-1 rounded-full text-xs font-medium hidden sm:block ${chantierActuel.statut === 'en-cours' ? 'bg-green-500 text-white' :
-              chantierActuel.statut === 'planifie' ? 'bg-blue-500 text-white' :
-                chantierActuel.statut === 'termine' ? 'bg-gray-500 text-white' :
-                  'bg-red-500 text-white'
+            chantierActuel.statut === 'planifie' ? 'bg-blue-500 text-white' :
+              chantierActuel.statut === 'termine' ? 'bg-gray-500 text-white' :
+                'bg-red-500 text-white'
             }`}>
             {chantierActuel.statut === 'en-cours' ? 'En cours' :
               chantierActuel.statut === 'planifie' ? 'Planifié' :
@@ -81,11 +80,11 @@ export function ChantierHeader({ userProfile, onLogout, onNavigate }: ChantierHe
               >
                 <User className="w-4 h-4 text-white" />
               </button>
-              
+
               {showUserMenu && (
                 <>
-                  <div 
-                    className="fixed inset-0 z-40" 
+                  <div
+                    className="fixed inset-0 z-40"
                     onClick={() => setShowUserMenu(false)}
                   />
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-1 z-50">

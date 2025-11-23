@@ -1,14 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Send, MessageCircle, User, Clock, FileText, AlertCircle, CheckCircle, Trash2 } from 'lucide-react';
+import { Send, MessageCircle, User, AlertCircle, Trash2, CreditCard, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { useChantier } from '../../contexts/ChantierContext';
-import { unifiedMessagesService, type Message } from '../../firebase/unified-services';
+import {
+  unifiedMessagesService,
+  unifiedPaiementsService,
+  unifiedEntreprisesService,
+  type Message,
+  type Paiement
+} from '../../firebase/unified-services';
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { ConfirmModal } from '../ConfirmModal';
 
+type PendingPaiement = Paiement & { entrepriseNom: string };
 
 export function ChantierChat() {
-  const { chantierActuel } = useChantier();
+  const { chantierActuel, budgetActuel } = useChantier();
 
   // Détecter le type d'utilisateur depuis l'URL ou le contexte
   const isClientInterface = window.location.pathname.includes('/client') ||
@@ -17,39 +24,80 @@ export function ChantierChat() {
     document.querySelector('.bg-gray-50') !== null;
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [showValidationModal, setShowValidationModal] = useState(false);
   const [chatVisible, setChatVisible] = useState(false);
   const [showPurgeConfirm, setShowPurgeConfirm] = useState(false);
+  const [pendingPaiements, setPendingPaiements] = useState<PendingPaiement[]>([]);
+  const [loadingDecisions, setLoadingDecisions] = useState(false);
+  const [showDecisionHistory, setShowDecisionHistory] = useState(true);
 
   type LoadMessagesOptions = {
     markAsRead?: boolean;
-    allowWelcome?: boolean;
   };
 
   // Charger les messages du chantier actuel
   useEffect(() => {
     if (chantierActuel) {
-      loadMessagesForChantier(chantierActuel.id!, { markAsRead: false, allowWelcome: true }); // Ne pas marquer comme lu au chargement
+      loadMessagesForChantier(chantierActuel.id!, { markAsRead: false }); // Ne pas marquer comme lu au chargement
       setChatVisible(true); // Le chat est maintenant visible
     }
   }, [chantierActuel]);
-  
+
   // Marquer comme lus après un court délai quand le chat devient visible
   useEffect(() => {
     if (chatVisible && chantierActuel) {
       const timer = setTimeout(() => {
         markMessagesAsRead(chantierActuel.id!);
       }, 1000); // Attendre 1 seconde avant de marquer comme lu
-      
+
       return () => clearTimeout(timer);
     }
   }, [chatVisible, chantierActuel]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchPendingPaiements = async () => {
+      if (!chantierActuel?.id) {
+        if (isMounted) setPendingPaiements([]);
+        return;
+      }
+
+      try {
+        setLoadingDecisions(true);
+        const [paiementsData, entreprisesData] = await Promise.all([
+          unifiedPaiementsService.getByChantier(chantierActuel.id),
+          unifiedEntreprisesService.getByChantier(chantierActuel.id)
+        ]);
+        if (!isMounted) return;
+
+        const entrepriseMap = new Map(entreprisesData.map(ent => [ent.id!, ent.nom]));
+        const enAttente = paiementsData
+          .filter(p => p.statut !== 'regle')
+          .sort((a, b) => a.datePrevue.getTime() - b.datePrevue.getTime())
+          .map(p => ({
+            ...p,
+            entrepriseNom: entrepriseMap.get(p.entrepriseId) ?? 'Entreprise inconnue'
+          }));
+
+        setPendingPaiements(enAttente);
+      } catch (error) {
+        console.error('Erreur chargement paiements en attente:', error);
+        if (isMounted) setPendingPaiements([]);
+      } finally {
+        if (isMounted) setLoadingDecisions(false);
+      }
+    };
+
+    fetchPendingPaiements();
+    return () => {
+      isMounted = false;
+    };
+  }, [chantierActuel?.id]);
 
   const loadMessagesForChantier = async (
     chantierId: string,
     options: LoadMessagesOptions = {}
   ) => {
-    const { markAsRead = false, allowWelcome = true } = options;
+    const { markAsRead = false } = options;
     try {
       console.log(`🔍 Chargement messages Firebase V2 pour ${chantierId}`);
 
@@ -58,11 +106,7 @@ export function ChantierChat() {
 
       console.log(`✅ ${messagesData.length} messages chargés depuis Firebase V2`);
 
-      // Si aucun message, créer les messages de bienvenue
-      if (messagesData.length === 0 && allowWelcome) {
-        console.log('🔄 Création des messages de bienvenue...');
-        await createWelcomeMessages(chantierId);
-      } else if (markAsRead) {
+      if (markAsRead) {
         // Marquer comme lus seulement si demandé explicitement
         await markMessagesAsRead(chantierId);
       }
@@ -71,58 +115,30 @@ export function ChantierChat() {
       setMessages([]);
     }
   };
-  
+
   const markMessagesAsRead = async (chantierId: string) => {
     try {
       const messagesData = await unifiedMessagesService.getByChantier(chantierId);
       const currentUserType = isClientInterface ? 'client' : 'professional';
-      const unreadMessages = messagesData.filter(msg => 
+      const unreadMessages = messagesData.filter(msg =>
         !msg.isRead && msg.sender !== currentUserType
       );
-      
+
       if (unreadMessages.length > 0) {
         const messageIds = unreadMessages.map(msg => msg.id!).filter(id => id);
         await unifiedMessagesService.markAsRead(chantierId, messageIds);
         console.log(`✅ ${messageIds.length} messages marqués comme lus`);
-        
+
         // Recharger pour mettre à jour l'affichage
         const updatedMessages = await unifiedMessagesService.getByChantier(chantierId);
         setMessages(updatedMessages);
-        
+
         // Notifier pour mettre à jour le badge
         window.dispatchEvent(new Event('messages-updated'));
       }
     } catch (error) {
       console.error('Erreur marquage messages comme lus:', error);
     }
-  };
-
-  const createWelcomeMessages = async (chantierId: string) => {
-    const welcomeMessages = [
-      {
-        sender: 'professional' as const,
-        senderName: 'Administrateur',
-        content: `Bonjour ! Bienvenue sur votre espace de suivi de chantier. Je serai votre interlocuteur pour ce projet.`,
-        timestamp: new Date(Date.now() - 30 * 60 * 1000),
-        type: 'text' as const,
-        isRead: true
-      },
-      {
-        sender: 'professional' as const,
-        senderName: 'Administrateur',
-        content: `N'hésitez pas à me poser vos questions via cette messagerie. Je vous tiendrai informé de l'avancement des travaux.`,
-        timestamp: new Date(Date.now() - 15 * 60 * 1000),
-        type: 'text' as const,
-        isRead: true
-      }
-    ];
-
-    for (const message of welcomeMessages) {
-      await unifiedMessagesService.create(chantierId, message);
-    }
-
-    // Recharger après création
-    await loadMessagesForChantier(chantierId);
   };
 
   const handleSendMessage = async () => {
@@ -144,8 +160,9 @@ export function ChantierChat() {
       setNewMessage('');
 
       // Recharger les messages (sans marquer comme lu, c'est notre propre message)
-      await loadMessagesForChantier(chantierActuel.id!, { markAsRead: false, allowWelcome: true });
-      
+      await loadMessagesForChantier(chantierActuel.id!, { markAsRead: false });
+      await loadMessagesForChantier(chantierActuel.id!, { markAsRead: false });
+
       // Notifier les autres composants pour mettre à jour le badge
       window.dispatchEvent(new Event('messages-updated'));
     } catch (error) {
@@ -153,29 +170,6 @@ export function ChantierChat() {
     }
   };
 
-
-  const handleDemanderValidation = async (type: string, description: string) => {
-    if (!chantierActuel) return;
-
-    try {
-      const validationMessage = {
-        sender: 'professional' as const,
-        senderName: 'Administrateur',
-        content: `Demande de validation: ${description}`,
-        timestamp: new Date(),
-        type: 'validation' as const,
-        isRead: false
-      };
-
-      await unifiedMessagesService.create(chantierActuel.id!, validationMessage);
-      console.log('✅ Demande de validation envoyée en Firebase V2');
-
-      await loadMessagesForChantier(chantierActuel.id!, { markAsRead: false, allowWelcome: true });
-      setShowValidationModal(false);
-    } catch (error) {
-      console.error('Erreur envoi validation:', error);
-    }
-  };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -193,13 +187,41 @@ export function ChantierChat() {
     return date.toDateString() === today.toDateString();
   };
 
+  const formatShortDate = (date: Date) => {
+    return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+  };
+
+  const getPaiementStatusBadge = (statut: Paiement['statut']) => {
+    switch (statut) {
+      case 'en-retard':
+        return { label: 'En retard', className: 'bg-red-500/20 text-red-300 border border-red-500/30' };
+      case 'prevu':
+        return { label: 'En attente', className: 'bg-yellow-500/20 text-yellow-200 border border-yellow-500/30' };
+      case 'regle':
+      default:
+        return { label: 'Réglé', className: 'bg-green-500/20 text-green-200 border border-green-500/30' };
+    }
+  };
+
+  const getPaiementTypeLabel = (type: Paiement['type']) => {
+    switch (type) {
+      case 'acompte':
+        return 'Acompte';
+      case 'situation':
+        return 'Situation';
+      case 'solde':
+      default:
+        return 'Solde';
+    }
+  };
+
   const handlePurgeMessages = async () => {
     if (!chantierActuel) return;
     setShowPurgeConfirm(false);
 
     try {
       console.log(`🗑️ Purge de tous les messages du chantier ${chantierActuel.id}`);
-      
+
       const messagesSnapshot = await getDocs(collection(db, `chantiers/${chantierActuel.id}/messages`));
       console.log(`📦 ${messagesSnapshot.size} messages à supprimer`);
 
@@ -210,13 +232,13 @@ export function ChantierChat() {
       }
 
       console.log(`✅ ${count} messages supprimés`);
-      
+
       // Recharger les messages (vide)
-      await loadMessagesForChantier(chantierActuel.id, { markAsRead: false, allowWelcome: false });
-      
+      await loadMessagesForChantier(chantierActuel.id!, { markAsRead: false });
+
       // Notifier
       window.dispatchEvent(new Event('messages-updated'));
-      
+
     } catch (error) {
       console.error('❌ Erreur purge messages:', error);
     }
@@ -247,13 +269,6 @@ export function ChantierChat() {
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setShowValidationModal(true)}
-            className="btn-primary text-sm flex items-center space-x-2"
-          >
-            <AlertCircle className="w-4 h-4" />
-            <span className="hidden md:inline">Demander validation</span>
-          </button>
           {messages.length > 0 && (
             <button
               onClick={() => setShowPurgeConfirm(true)}
@@ -281,13 +296,83 @@ export function ChantierChat() {
                 chantierActuel.statut === 'planifie' ? 'Planifié' :
                   chantierActuel.statut === 'termine' ? 'Terminé' : 'Suspendu'}
             </div>
-            {chantierActuel.budget && (
+            {budgetActuel !== null && (
               <p className="text-xs text-gray-400 mt-1">
-                Budget: {chantierActuel.budget.toLocaleString()} €
+                Budget: {budgetActuel.toLocaleString()} €
               </p>
             )}
           </div>
         </div>
+      </div>
+
+      {/* Historique des décisions / paiements en attente */}
+      <div className="bg-gray-700 rounded-lg p-4 space-y-3">
+        <div className="flex items-start justify-between">
+          <div>
+            <h4 className="font-medium text-gray-100 flex items-center space-x-2">
+              <CreditCard className="w-4 h-4 text-primary-300" />
+              <span>Historique des décisions</span>
+            </h4>
+            <p className="text-xs text-gray-400 mt-1">
+              {loadingDecisions
+                ? 'Chargement des paiements en attente...'
+                : pendingPaiements.length > 0
+                  ? `${pendingPaiements.length} paiement(s) en attente côté client`
+                  : 'Aucune demande de paiement en attente'}
+            </p>
+          </div>
+          <button
+            onClick={() => setShowDecisionHistory(prev => !prev)}
+            className="text-xs text-primary-300 hover:text-primary-200 transition-colors flex items-center space-x-1"
+          >
+            <span>{showDecisionHistory ? 'Masquer' : 'Afficher'}</span>
+            {showDecisionHistory ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+        </div>
+        {showDecisionHistory && (
+          <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+            {pendingPaiements.length === 0 && !loadingDecisions && (
+              <div className="text-sm text-gray-400 bg-gray-800/50 border border-gray-600/50 rounded-lg p-3">
+                Aucun paiement en attente pour ce chantier.
+              </div>
+            )}
+            {pendingPaiements.map((paiement) => {
+              const badge = getPaiementStatusBadge(paiement.statut);
+              return (
+                <div
+                  key={paiement.id}
+                  className="bg-gray-800/60 border border-gray-600/60 rounded-lg p-3 space-y-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-100">{paiement.entrepriseNom}</p>
+                      <p className="text-xs text-gray-400">
+                        {getPaiementTypeLabel(paiement.type)} • Échéance {formatShortDate(paiement.datePrevue)}
+                      </p>
+                    </div>
+                    <span
+                      className={`px-2 py-1 text-xs rounded-full font-medium ${badge.className}`}
+                    >
+                      {badge.label}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm text-gray-200">
+                    <div className="flex items-center space-x-2">
+                      <Clock className="w-4 h-4 text-gray-400" />
+                      <span>Prévu le {paiement.datePrevue.toLocaleDateString('fr-FR')}</span>
+                    </div>
+                    <span className="font-semibold">{paiement.montant.toLocaleString()} €</span>
+                  </div>
+                  {paiement.notes && (
+                    <p className="text-xs text-gray-400 border-t border-gray-700 pt-2">
+                      {paiement.notes}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Zone des messages */}
@@ -373,7 +458,7 @@ export function ChantierChat() {
           <p>• <strong>Paiements</strong> : Échéances, factures, acomptes</p>
         </div>
       </div>
-      
+
       {/* Modal de confirmation de purge */}
       <ConfirmModal
         isOpen={showPurgeConfirm}

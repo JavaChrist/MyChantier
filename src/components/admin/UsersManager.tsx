@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Users, Edit2, Save, X, AlertCircle, Trash2 } from 'lucide-react';
 import { authService, type UserProfile } from '../../firebase/auth';
 import { chantierService } from '../../firebase/chantiers';
+import { useChantier } from '../../contexts/ChantierContext';
 import { useAlertModal } from '../AlertModal';
 
 export function UsersManager() {
@@ -11,10 +12,11 @@ export function UsersManager() {
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<{ chantierId?: string; role: 'client' | 'professional' }>({ role: 'client' });
   const { showAlert, AlertModalComponent } = useAlertModal();
+  const { chantierId } = useChantier();
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [chantierId]);
 
   const loadData = async () => {
     try {
@@ -27,7 +29,11 @@ export function UsersManager() {
       // NE PAS ajouter de "chantier-principal" fictif
       // Seuls les vrais chantiers de Firebase sont utilisables
       
-      setUsers(usersData);
+      const filteredUsers = chantierId
+        ? usersData.filter(user => user.chantierId === chantierId)
+        : usersData;
+
+      setUsers(filteredUsers);
       setChantiers(chantiersData);
     } catch (error) {
       console.error('Erreur chargement données:', error);

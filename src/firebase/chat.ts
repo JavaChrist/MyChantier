@@ -6,7 +6,6 @@ import {
   updateDoc,
   query,
   orderBy,
-  where,
   onSnapshot,
   Timestamp,
   serverTimestamp
@@ -27,6 +26,8 @@ export interface ChatMessage {
   decisionData?: DecisionData;
   isRead: boolean;
 }
+
+export type ChatMessageType = ChatMessage['type'];
 
 export interface ChatAttachment {
   id: string;

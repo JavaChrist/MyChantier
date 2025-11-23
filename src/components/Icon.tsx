@@ -63,10 +63,10 @@ export function Icon({ name, size = 24, className = '' }: IconProps) {
         objectFit: 'contain',
         ...iconStyle
       }}
-      onError={(e) => {
+      onError={(event) => {
         console.warn(`⚠️ Icône ${name} non disponible (mode hors ligne)`);
         // Masquer l'image cassée
-        (e.target as HTMLImageElement).style.display = 'none';
+        (event.target as HTMLImageElement).style.display = 'none';
       }}
     />
   );
@@ -75,7 +75,7 @@ export function Icon({ name, size = 24, className = '' }: IconProps) {
 // Composant pour l'icône principale de l'app
 export function AppIcon({ size = 48, className = '' }: { size?: number; className?: string }) {
   const [imageError, setImageError] = React.useState(false);
-  
+
   // Choisir la bonne taille selon le size demandé
   const getIconSize = (requestedSize: number) => {
     if (requestedSize <= 16) return '/logo16.png';
@@ -93,20 +93,20 @@ export function AppIcon({ size = 48, className = '' }: { size?: number; classNam
   // SVG Fallback si l'image ne charge pas
   if (imageError) {
     return (
-      <svg 
-        width={size} 
-        height={size} 
-        viewBox="0 0 100 100" 
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 100 100"
         className={`inline-block ${className}`}
         fill="currentColor"
       >
-        <rect width="100" height="100" fill="#0284c7" rx="15"/>
-        <text 
-          x="50" 
-          y="65" 
-          fontSize="50" 
-          fontWeight="bold" 
-          textAnchor="middle" 
+        <rect width="100" height="100" fill="#0284c7" rx="15" />
+        <text
+          x="50"
+          y="65"
+          fontSize="50"
+          fontWeight="bold"
+          textAnchor="middle"
           fill="white"
         >
           SC
@@ -123,7 +123,7 @@ export function AppIcon({ size = 48, className = '' }: { size?: number; classNam
       height={size}
       className={`inline-block ${className}`}
       style={{ objectFit: 'contain' }}
-      onError={(e) => {
+      onError={() => {
         console.warn(`⚠️ Logo ${getIconSize(size)} non chargé, utilisation fallback SVG`);
         setImageError(true);
       }}

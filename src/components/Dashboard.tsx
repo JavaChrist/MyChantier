@@ -9,7 +9,7 @@ interface DashboardProps {
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
-  const { chantierId, chantierActuel } = useChantier();
+  const { chantierId, chantierActuel, budgetActuel } = useChantier();
   const {
     entreprises,
     devis,
@@ -83,11 +83,15 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       const dans7Jours = new Date(maintenant);
       dans7Jours.setDate(dans7Jours.getDate() + 7);
 
-      const rendezVousProchains = rendezVous.filter(rdv =>
-        rdv.dateHeure >= maintenant &&
-        rdv.dateHeure <= dans7Jours &&
-        rdv.statut === 'planifie'
-      ).length;
+      const rendezVousProchains = rendezVous.filter(rdv => {
+        const dateDebut = rdv.dateDebut ?? rdv.dateFin;
+        if (!dateDebut) return false;
+        return (
+          dateDebut >= maintenant &&
+          dateDebut <= dans7Jours &&
+          (rdv.statut === 'planifie' || rdv.statut === 'confirme')
+        );
+      }).length;
 
       setStats({
         entreprises: entreprises.length,
@@ -182,6 +186,21 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
       {/* Statistiques */}
       <div className="mobile-grid">
+        {chantierActuel && (
+          <div className="card-mobile hover:bg-gray-750 cursor-pointer transition-colors">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-teal-600 rounded-lg">
+                <CreditCard className="w-5 h-5 md:w-6 md:h-6 text-white" />
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs md:text-sm">Budget actif</p>
+                <p className="text-xl md:text-2xl font-bold text-gray-100">
+                  {(budgetActuel ?? chantierActuel.budget ?? 0).toLocaleString()} €
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         <div
           className="card-mobile hover:bg-gray-750 cursor-pointer transition-colors"
           onClick={() => handleCardClick('entreprises')}

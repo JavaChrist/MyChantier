@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Paperclip, Image, FileText, CheckCircle, X, Clock, AlertCircle } from 'lucide-react';
-import { chatService, conversationService, uploadChatFile } from '../../firebase/chat';
+import { Send, Paperclip, Image, FileText, CheckCircle, X, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { chatService, uploadChatFile, type ChatMessageType } from '../../firebase/chat';
 import type { ChatMessage, Conversation, DecisionData } from '../../firebase/chat';
 import { Modal } from '../Modal';
 import { useAlertModal } from '../AlertModal';
@@ -18,6 +18,7 @@ export function ClientChat({ conversation, currentUserId, currentUserName, curre
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [showDecisionModal, setShowDecisionModal] = useState(false);
+  const [showDecisionHistory, setShowDecisionHistory] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { showAlert, AlertModalComponent } = useAlertModal();
 
@@ -61,7 +62,7 @@ export function ClientChat({ conversation, currentUserId, currentUserName, curre
       }
 
       // Envoyer le message
-      const messageData = {
+      const messageData: Omit<ChatMessage, 'id' | 'conversationId'> = {
         senderId: currentUserId,
         senderName: currentUserName,
         senderType: currentUserType,
@@ -81,7 +82,11 @@ export function ClientChat({ conversation, currentUserId, currentUserName, curre
       setSelectedFile(null);
     } catch (error) {
       console.error('Erreur envoi message:', error);
-      showAlert('Erreur', `Erreur lors de l'envoi: ${error.message}`, 'error');
+      showAlert(
+        'Erreur',
+        `Erreur lors de l'envoi: ${error instanceof Error ? error.message : 'Erreur inconnue'}`,
+        'error'
+      );
     } finally {
       setLoading(false);
     }
@@ -114,7 +119,7 @@ export function ClientChat({ conversation, currentUserId, currentUserName, curre
     return date.toDateString() === today.toDateString();
   };
 
-  const getMessageIcon = (type: string) => {
+  const getMessageIcon = (type: ChatMessageType) => {
     switch (type) {
       case 'decision':
         return <AlertCircle className="w-4 h-4 text-yellow-400" />;
@@ -126,6 +131,36 @@ export function ClientChat({ conversation, currentUserId, currentUserName, curre
         return <FileText className="w-4 h-4 text-purple-400" />;
       default:
         return null;
+    }
+  };
+
+  const decisionMessages = messages
+    .filter((message) => message.type === 'decision' && message.decisionData)
+    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+  const pendingDecisions = decisionMessages.filter((message) => message.decisionData?.status === 'pending');
+
+  const getDecisionStatusStyles = (status: DecisionData['status']) => {
+    switch (status) {
+      case 'approved':
+        return 'bg-green-100 text-green-800 border border-green-200';
+      case 'rejected':
+        return 'bg-red-100 text-red-800 border border-red-200';
+      case 'pending':
+      default:
+        return 'bg-yellow-100 text-yellow-800 border border-yellow-200';
+    }
+  };
+
+  const getDecisionStatusLabel = (status: DecisionData['status']) => {
+    switch (status) {
+      case 'approved':
+        return 'Approuvé';
+      case 'rejected':
+        return 'Refusé';
+      case 'pending':
+      default:
+        return 'En attente';
     }
   };
 
@@ -160,6 +195,68 @@ export function ClientChat({ conversation, currentUserId, currentUserName, curre
           </button>
         </div>
       </div>
+      {/* Historique des décisions */}
+      {decisionMessages.length > 0 && (
+        <div className="bg-white border-b border-gray-200 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-semibold text-gray-800">Historique des décisions</h4>
+              <p className="text-xs text-gray-500">
+                {pendingDecisions.length > 0
+                  ? `${pendingDecisions.length} décision(s) en attente`
+                  : 'Aucune décision en attente'}
+              </p>
+            </div>
+            <button
+              onClick={() => setShowDecisionHistory((prev) => !prev)}
+              className="text-primary-600 text-xs flex items-center space-x-1"
+            >
+              <span>{showDecisionHistory ? 'Masquer' : 'Afficher'}</span>
+              {showDecisionHistory ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+          </div>
+          {showDecisionHistory && (
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {decisionMessages.map((message) => (
+                <div
+                  key={message.id}
+                  className="border border-gray-200 rounded-lg p-3 bg-gray-50"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">
+                        {message.decisionData?.title || 'Décision'}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {message.timestamp.toLocaleDateString('fr-FR')} • {message.senderName}
+                      </p>
+                    </div>
+                    <span
+                      className={`px-2 py-1 text-xs font-medium rounded-full ${getDecisionStatusStyles(
+                        message.decisionData?.status ?? 'pending'
+                      )}`}
+                    >
+                      {getDecisionStatusLabel(message.decisionData?.status ?? 'pending')}
+                    </span>
+                  </div>
+                  {message.decisionData?.description && (
+                    <p className="text-xs text-gray-600 mb-2">
+                      {message.decisionData.description}
+                    </p>
+                  )}
+                  {message.decisionData?.options && message.decisionData.options.length > 0 && (
+                    <div className="text-xs text-gray-500 space-y-1">
+                      {message.decisionData.options.map((option, index) => (
+                        <p key={index}>• {option}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">

@@ -46,49 +46,6 @@ export function EtapesManager() {
     }
   };
 
-  const createDefaultEtapes = async () => {
-    const etapesParDefaut = [
-      {
-        nom: 'Préparation du chantier',
-        description: 'Préparation et protection des espaces',
-        dateDebut: new Date(),
-        dateFin: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-        statut: 'planifiee' as const,
-        ordre: 1
-      },
-      {
-        nom: 'Gros œuvre',
-        description: 'Travaux de structure et maçonnerie',
-        dateDebut: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000),
-        dateFin: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-        statut: 'planifiee' as const,
-        ordre: 2
-      },
-      {
-        nom: 'Second œuvre',
-        description: 'Plomberie, électricité, cloisons',
-        dateDebut: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
-        dateFin: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000),
-        statut: 'planifiee' as const,
-        ordre: 3
-      },
-      {
-        nom: 'Finitions',
-        description: 'Peinture, revêtements, finitions',
-        dateDebut: new Date(Date.now() + 26 * 24 * 60 * 60 * 1000),
-        dateFin: new Date(Date.now() + 35 * 24 * 60 * 60 * 1000),
-        statut: 'planifiee' as const,
-        ordre: 4
-      }
-    ];
-
-    for (const etape of etapesParDefaut) {
-      await unifiedEtapesService.create(chantierId!, etape);
-    }
-
-    // Recharger après création
-    await loadEtapes();
-  };
 
 
   const handleCreateEtape = () => {
@@ -385,7 +342,7 @@ function EtapeForm({
     description: '',
     dateDebut: '',
     dateFin: '',
-    statut: 'planifiee' as const,
+    statut: 'planifiee' as 'planifiee' | 'en-cours' | 'terminee' | 'en-retard',
     entrepriseId: '',
     ordre: 1,
     notes: ''
@@ -444,7 +401,7 @@ function EtapeForm({
           </label>
           <select
             value={formData.statut}
-            onChange={(e) => setFormData(prev => ({ ...prev, statut: e.target.value as any }))}
+            onChange={(e) => setFormData(prev => ({ ...prev, statut: e.target.value as typeof prev.statut }))}
             className="input-field w-full"
           >
             <option value="planifiee">Planifiée</option>

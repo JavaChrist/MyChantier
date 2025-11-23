@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { MessageCircle, Calendar, FileText, CreditCard, LogOut, User, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { useChantierData } from '../../hooks/useChantierData';
-import { ChantierChat } from '../chat/ChantierChat';
+import { ClientChat } from './ClientChat';
 import { ClientDocuments } from './ClientDocuments';
 import { ClientPlanning } from './ClientPlanning';
 
@@ -13,7 +13,7 @@ interface ClientInterfaceProps {
 
 export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInterfaceProps) {
   const [currentView, setCurrentView] = useState('overview');
-  const { entreprises, devis, commandes, paiements, loading } = useChantierData(chantierId);
+  const { entreprises, devis, commandes, paiements, loading, reloadData } = useChantierData(chantierId);
 
   // Calculer les stats pour le client
   const stats = {
@@ -27,15 +27,22 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
   const renderContent = () => {
     switch (currentView) {
       case 'overview':
-        return <ClientOverview stats={stats} entreprises={entreprises} devis={devis} />;
+        return <ClientOverview stats={stats} entreprises={entreprises} devis={devis} onNavigate={setCurrentView} />;
       case 'chat':
         return <ClientChat chantierId={chantierId} userProfile={userProfile} />;
       case 'documents':
-        return <ClientDocuments devis={devis} />;
+        return (
+          <ClientDocuments
+            devis={devis}
+            chantierId={chantierId}
+            onReload={reloadData}
+            entreprises={entreprises}
+          />
+        );
       case 'planning':
         return <ClientPlanning chantierId={chantierId} />;
       default:
-        return <ClientOverview stats={stats} entreprises={entreprises} devis={devis} />;
+        return <ClientOverview stats={stats} entreprises={entreprises} devis={devis} onNavigate={setCurrentView} />;
     }
   };
 
@@ -90,8 +97,8 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
                   key={item.id}
                   onClick={() => setCurrentView(item.id)}
                   className={`flex items-center space-x-2 px-4 py-3 border-b-2 transition-colors ${currentView === item.id
-                      ? 'border-primary-500 text-primary-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
                     }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -111,8 +118,21 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
   );
 }
 
+type ClientOverviewProps = {
+  stats: {
+    entreprises: number;
+    devisEnAttente: number;
+    devisValides: number;
+    commandesActives: number;
+    paiementsEnRetard: number;
+  };
+  entreprises: any[];
+  devis: any[];
+  onNavigate: (view: string) => void;
+};
+
 // Vue d'ensemble pour le client
-function ClientOverview({ stats, entreprises, devis }: any) {
+function ClientOverview({ stats, onNavigate }: ClientOverviewProps) {
   const progression = Math.round((stats.devisValides / Math.max(stats.devisValides + stats.devisEnAttente, 1)) * 100);
 
   return (
@@ -195,7 +215,7 @@ function ClientOverview({ stats, entreprises, devis }: any) {
             </div>
           </div>
           <button
-            onClick={() => setCurrentView('documents')}
+            onClick={() => onNavigate('documents')}
             className="w-full md:w-auto px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-medium transition-colors"
           >
             Consulter les devis
@@ -253,7 +273,3 @@ function ClientOverview({ stats, entreprises, devis }: any) {
   );
 }
 
-// Chat client (utilise le composant dédié)
-function ClientChat({ chantierId, userProfile }: any) {
-  return <ChantierChat />; // Utilise le composant de chat existant
-}

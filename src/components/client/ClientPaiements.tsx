@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CreditCard, CheckCircle, Clock, AlertCircle, Upload, X, Building2 } from 'lucide-react';
+import { CreditCard, CheckCircle, Upload, X, Building2 } from 'lucide-react';
 import { Modal } from '../Modal';
 import { useAlertModal } from '../AlertModal';
 
@@ -36,9 +36,9 @@ export function ClientPaiements({ paiements, entreprises }: ClientPaiementsProps
 
   const getTypeLabel = (type: string) => {
     switch (type) {
-      case 'acompte': return 'Acompte (30%)';
-      case 'situation': return 'Situation (40%)';
-      case 'solde': return 'Solde final (30%)';
+      case 'acompte': return 'Acompte';
+      case 'situation': return 'Situation';
+      case 'solde': return 'Solde final';
       default: return type;
     }
   };
@@ -204,8 +204,8 @@ export function ClientPaiements({ paiements, entreprises }: ClientPaiementsProps
                           <button
                             onClick={() => handleValidatePaiement(paiement)}
                             className={`w-full px-4 py-2 text-white rounded-lg font-medium transition-colors ${isEnRetard
-                                ? 'bg-red-500 hover:bg-red-600'
-                                : 'bg-green-500 hover:bg-green-600'
+                              ? 'bg-red-500 hover:bg-red-600'
+                              : 'bg-green-500 hover:bg-green-600'
                               }`}
                           >
                             ✅ Confirmer le paiement effectué

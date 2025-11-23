@@ -403,6 +403,7 @@ export function EntreprisesManager() {
         size="lg"
       >
         <EntrepriseForm
+          chantierId={chantierId || ''}
           entreprise={selectedEntreprise}
           onSave={handleSaveEntreprise}
           onCancel={() => setIsModalOpen(false)}

@@ -1,4 +1,3 @@
-import React from 'react';
 import { AlertTriangle, Check, X } from 'lucide-react';
 
 interface ConfirmModalProps {
@@ -9,7 +8,7 @@ interface ConfirmModalProps {
   message: string;
   confirmText?: string;
   cancelText?: string;
-  type?: 'danger' | 'warning' | 'info';
+  type?: 'danger' | 'warning' | 'info' | 'success';
 }
 
 export function ConfirmModal({
@@ -30,6 +29,8 @@ export function ConfirmModal({
         return 'text-red-400 bg-red-400/10';
       case 'warning':
         return 'text-yellow-400 bg-yellow-400/10';
+      case 'success':
+        return 'text-green-400 bg-green-400/10';
       default:
         return 'text-blue-400 bg-blue-400/10';
     }
@@ -41,6 +42,8 @@ export function ConfirmModal({
         return 'bg-red-600 hover:bg-red-700';
       case 'warning':
         return 'bg-yellow-600 hover:bg-yellow-700';
+      case 'success':
+        return 'bg-green-600 hover:bg-green-700';
       default:
         return 'bg-primary-600 hover:bg-primary-700';
     }

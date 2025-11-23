@@ -6,6 +6,7 @@ import { useChantier } from '../../contexts/ChantierContext';
 import { Modal } from '../Modal';
 import { ConfirmModal } from '../ConfirmModal';
 import { useAlertModal } from '../AlertModal';
+import { unifiedBudgetService } from '../../firebase/unified-services';
 
 interface ChantierSelectorProps {
   professionalId: string;
@@ -21,9 +22,30 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [selectedChantier, setSelectedChantier] = useState<Chantier | null>(null);
   const [chantierToDelete, setChantierToDelete] = useState<Chantier | null>(null);
+  const [showConfigureClientModal, setShowConfigureClientModal] = useState(false);
+  const [configureClientState, setConfigureClientState] = useState<{
+    chantier: Chantier | null;
+    step: 'askEmail' | 'creating' | 'done';
+    initialEmail: string;
+    inputEmail: string;
+    tempPassword: string;
+    resultType: 'created' | 'existing' | null;
+  }>({
+    chantier: null,
+    step: 'askEmail',
+    initialEmail: '',
+    inputEmail: '',
+    tempPassword: '',
+    resultType: null
+  });
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const { setChantierActuel, setChangtierId } = useChantier();
+  const [budgetMap, setBudgetMap] = useState<Record<string, number>>({});
+  const {
+    showAlert: showChantierAlert,
+    AlertModalComponent: ChantierAlertModal
+  } = useAlertModal();
 
   // Fonction pour obtenir le chantier Grohens-Pitet depuis Firebase V2
   const getChantierPrincipal = async (): Promise<Chantier> => {
@@ -41,9 +63,9 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
       const infoData = infoSnapshot.docs.length > 0 ? infoSnapshot.docs[0].data() : null;
 
       // Fusionner (priorité au parent qui est plus à jour)
-      const data = {
-        ...infoData,
-        ...parentData
+      const data: Record<string, any> = {
+        ...(infoData ?? {}),
+        ...(parentData ?? {})
       };
 
       console.log('✅ Chantier Grohens-Pitet chargé depuis Firebase V2');
@@ -129,9 +151,9 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
           const infoData = infoSnapshot.docs.length > 0 ? infoSnapshot.docs[0].data() : null;
 
           // Fusionner (priorité au parent pour les emails)
-          const data = {
-            ...infoData,
-            ...parentData,
+          const data: Record<string, any> = {
+            ...(infoData ?? {}),
+            ...(parentData ?? {}),
             // Les emails viennent du parent (plus à jour)
             clientEmail2: parentData?.clientEmail2 || infoData?.clientEmail2,
             clientEmail3: parentData?.clientEmail3 || infoData?.clientEmail3
@@ -214,6 +236,35 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
     }
   };
 
+  const fetchBudgetsForChantiers = async (liste: Chantier[]) => {
+    try {
+      const entries = await Promise.all(
+        liste.map(async (chantier) => {
+          if (!chantier.id) return [null, null] as const;
+          try {
+            const budgets = await unifiedBudgetService.getByChantier(chantier.id);
+            const actif = budgets.find(b => b.statut === 'actif');
+            return [chantier.id, actif ? actif.montantActuel : null] as const;
+          } catch (error) {
+            console.warn('Erreur chargement budget pour', chantier.id, error);
+            return [chantier.id, null] as const;
+          }
+        })
+      );
+
+      const map: Record<string, number> = {};
+      entries.forEach(([id, montant]) => {
+        if (id && montant !== null) {
+          map[id] = montant;
+        }
+      });
+      setBudgetMap(map);
+    } catch (error) {
+      console.warn('Erreur chargement budgets actifs:', error);
+      setBudgetMap({});
+    }
+  };
+
   const loadChantiers = async () => {
     try {
       setLoading(true);
@@ -225,15 +276,18 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
       if (tousLesChantiers.length === 0) {
         const chantierPrincipalFallback = await getChantierPrincipal();
         setChantiers([chantierPrincipalFallback]);
+        await fetchBudgetsForChantiers([chantierPrincipalFallback]);
         return;
       }
 
       setChantiers(tousLesChantiers);
+      await fetchBudgetsForChantiers(tousLesChantiers);
       console.log('🔧 CHARGEMENT V2: Tous les chantiers chargés depuis Firebase:', tousLesChantiers.map(c => ({ nom: c.nom, id: c.id })));
     } catch (error) {
       console.error('Erreur chargement chantiers:', error);
       const fallbackChantier = await getChantierPrincipal();
       setChantiers([fallbackChantier]);
+      await fetchBudgetsForChantiers([fallbackChantier]);
     } finally {
       setLoading(false);
     }
@@ -283,7 +337,7 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
         if (chantierData.clientEmail3 && chantierData.clientEmail3.trim()) {
           emailsMessage += `\nEmail tertiaire: ${chantierData.clientEmail3}`;
         }
-        
+
         setSuccessMessage(
           `Chantier "${chantierData.nom}" créé avec succès !\n\n` +
           `👤 Client: ${chantierData.clientNom}\n\n` +
@@ -341,7 +395,7 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
           dateCreation: Timestamp.fromDate(new Date()),
           dateModification: Timestamp.fromDate(new Date())
         };
-        
+
         // Ajouter les emails supplémentaires s'ils existent
         if (chantierData.clientEmail2 && chantierData.clientEmail2.trim()) {
           chantierDataForFirebase.clientEmail2 = chantierData.clientEmail2.trim();
@@ -396,86 +450,91 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
     setShowDeleteConfirmModal(true);
   };
 
-  const handleConfigureClientAccess = async (chantier: Chantier) => {
+  const handleConfigureClientAccess = (chantier: Chantier) => {
     const currentEmail = chantier.clientEmail;
     const hasValidEmail = currentEmail && currentEmail !== 'vos-donnees@existantes.com' && currentEmail.includes('@');
 
-    const clientEmail = prompt(
-      `Configurer l'accès client pour "${chantier.nom}"\n\n` +
-      `Email actuel: ${currentEmail}\n\n` +
-      `${hasValidEmail
-        ? 'Voulez-vous créer le compte pour cet email ou en saisir un nouveau ?'
-        : 'Saisissez le vrai email du client pour lui créer un accès :'
-      }`
-    ) || (hasValidEmail ? currentEmail : '');
+    setConfigureClientState({
+      chantier,
+      step: 'askEmail',
+      initialEmail: hasValidEmail ? currentEmail : '',
+      inputEmail: hasValidEmail ? currentEmail : '',
+      tempPassword: '',
+      resultType: null
+    });
+    setShowConfigureClientModal(true);
+  };
 
-    if (!clientEmail || clientEmail.trim() === '') return;
+  const handleCloseConfigureClientModal = () => {
+    setShowConfigureClientModal(false);
+    setConfigureClientState({
+      chantier: null,
+      step: 'askEmail',
+      initialEmail: '',
+      inputEmail: '',
+      tempPassword: '',
+      resultType: null
+    });
+  };
+  const handleConfigureClientConfirm = async () => {
+    if (!configureClientState.chantier) return;
 
-    // Valider l'email
+    const clientEmail = configureClientState.inputEmail.trim();
+    if (!clientEmail) {
+      showChantierAlert('Email requis', 'Veuillez saisir une adresse email valide.', 'warning');
+      return;
+    }
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(clientEmail)) {
-      setSuccessMessage('⚠️ Adresse email invalide.');
-      setShowSuccessModal(true);
+      showChantierAlert('Email invalide', 'Adresse email invalide.', 'warning');
       return;
     }
 
     try {
+      setConfigureClientState(prev => prev && { ...prev, step: 'creating', resultType: null });
+
       const { authService } = await import('../../firebase/auth');
       const { createUserWithEmailAndPassword, updateProfile, signOut } = await import('firebase/auth');
       const { auth } = await import('../../firebase/config');
 
       console.log('🔧 Configuration accès client pour le chantier:', clientEmail);
+      const tempPassword = 'temp' + Math.random().toString(36).substring(2, 12) + '!';
 
-      try {
-        // Créer le compte client
-        const tempPassword = 'temp' + Math.random().toString(36).substring(2, 12) + '!';
-        const clientCredential = await createUserWithEmailAndPassword(auth, clientEmail, tempPassword);
-        await updateProfile(clientCredential.user, { displayName: chantier.clientNom });
+      const chantier = configureClientState.chantier;
+      const clientCredential = await createUserWithEmailAndPassword(auth, clientEmail, tempPassword);
+      await updateProfile(clientCredential.user, { displayName: chantier.clientNom });
 
-        // Créer le profil client
-        await authService.createUserProfile(clientCredential.user.uid, {
-          email: clientEmail,
-          displayName: chantier.clientNom,
-          role: 'client',
-          chantierId: chantier.id
-        });
+      await authService.createUserProfile(clientCredential.user.uid, {
+        email: clientEmail,
+        displayName: chantier.clientNom,
+        role: 'client',
+        chantierId: chantier.id
+      });
 
-        // Se déconnecter du compte client
-        await signOut(auth);
+      await signOut(auth);
 
-        setSuccessMessage(
-          `Accès client configuré pour le chantier principal !\n\n` +
-          `👤 Client: ${chantier.clientNom} (${clientEmail})\n\n` +
-          `📧 Instructions à transmettre au client :\n\n` +
-          `1. Aller sur votre application de suivi de chantier\n` +
-          `2. Cliquer sur "Mot de passe oublié ?"\n` +
-          `3. Saisir son email: ${clientEmail}\n` +
-          `4. Vérifier ses emails et définir un mot de passe\n` +
-          `5. Se connecter avec son email et nouveau mot de passe\n\n` +
-          `✅ Il aura accès à toutes vos données existantes !`
-        );
-        setShowSuccessModal(true);
-
-      } catch (createError: any) {
-        if (createError.code === 'auth/email-already-in-use') {
-          setSuccessMessage(
-            `Email client mis à jour !\n\n` +
-            `ℹ️ Un compte existe déjà pour ${clientEmail}\n\n` +
-            `📧 Instructions pour le client :\n\n` +
-            `1. Utiliser "Mot de passe oublié ?" avec son email\n` +
-            `2. Ou se connecter s'il connaît son mot de passe\n\n` +
-            `Il aura accès à vos données existantes.`
-          );
-          setShowSuccessModal(true);
-        } else {
-          throw createError;
-        }
-      }
-
+      setConfigureClientState(prev => prev && {
+        ...prev,
+        step: 'done',
+        tempPassword,
+        inputEmail: clientEmail,
+        resultType: 'created'
+      });
     } catch (error: any) {
+      if (error?.code === 'auth/email-already-in-use') {
+        setConfigureClientState(prev => prev && {
+          ...prev,
+          step: 'done',
+          tempPassword: '',
+          inputEmail: clientEmail,
+          resultType: 'existing'
+        });
+        return;
+      }
       console.error('Erreur configuration accès client:', error);
-      setSuccessMessage(`❌ Erreur lors de la configuration : ${error.message}`);
-      setShowSuccessModal(true);
+      setShowConfigureClientModal(false);
+      showChantierAlert('Erreur', `Erreur lors de la configuration : ${error.message}`, 'error');
     }
   };
 
@@ -579,7 +638,7 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
         dateCreation: Timestamp.fromDate(selectedChantier.dateCreation),
         dateModification: Timestamp.fromDate(new Date())
       };
-      
+
       // Ajouter les emails supplémentaires s'ils existent
       if (chantierData.clientEmail2 && chantierData.clientEmail2.trim()) {
         chantierDataForFirebase.clientEmail2 = chantierData.clientEmail2.trim();
@@ -587,7 +646,7 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
       if (chantierData.clientEmail3 && chantierData.clientEmail3.trim()) {
         chantierDataForFirebase.clientEmail3 = chantierData.clientEmail3.trim();
       }
-      
+
       console.log('📦 Données de mise à jour avec emails:', {
         clientEmail: chantierDataForFirebase.clientEmail,
         clientEmail2: chantierDataForFirebase.clientEmail2,
@@ -720,133 +779,139 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {chantiers.map((chantier) => (
-              <div
-                key={chantier.id}
-                onClick={() => handleSelectChantier(chantier)}
-                className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl hover:border-primary-200 cursor-pointer transition-all group"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="p-3 bg-primary-100 rounded-xl group-hover:bg-primary-200 transition-colors">
-                    <AppIcon size={32} />
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatutColor(chantier.statut)}`}>
-                      {getStatutLabel(chantier.statut)}
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditChantier(chantier);
-                        }}
-                        className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg transition-colors"
-                        title="Modifier le chantier"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      {/* Bouton configurer accès client pour tous les chantiers */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleConfigureClientAccess(chantier);
-                        }}
-                        className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                        title="Configurer l'accès client"
-                      >
-                        <Users className="w-4 h-4" />
-                      </button>
+            {chantiers.map((chantier) => {
+              const budgetValue = chantier.id
+                ? (budgetMap[chantier.id] ?? chantier.budget ?? 0)
+                : (chantier.budget ?? 0);
 
-                      {/* Bouton de suppression */}
-                      {chantier.id !== 'chantier-grohens-pitet' && (
+              return (
+                <div
+                  key={chantier.id}
+                  onClick={() => handleSelectChantier(chantier)}
+                  className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl hover:border-primary-200 cursor-pointer transition-all group"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="p-3 bg-primary-100 rounded-xl group-hover:bg-primary-200 transition-colors">
+                      <AppIcon size={32} />
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatutColor(chantier.statut)}`}>
+                        {getStatutLabel(chantier.statut)}
+                      </div>
+                      <div className="flex items-center space-x-1">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteChantier(chantier);
+                            handleEditChantier(chantier);
                           }}
-                          className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Supprimer le chantier"
+                          className="p-2 text-gray-500 hover:text-primary-600 hover:bg-gray-100 rounded-lg transition-colors"
+                          title="Modifier le chantier"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Edit2 className="w-4 h-4" />
                         </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                        {/* Bouton configurer accès client pour tous les chantiers */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleConfigureClientAccess(chantier);
+                          }}
+                          className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                          title="Configurer l'accès client"
+                        >
+                          <Users className="w-4 h-4" />
+                        </button>
 
-                <div className="space-y-3">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-800 group-hover:text-primary-600 transition-colors">
-                      {chantier.nom}
-                    </h3>
-                    <p className="text-sm text-gray-600 line-clamp-2">
-                      {chantier.description}
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2 text-sm text-gray-600">
-                      <Users className="w-4 h-4" />
-                      <span>{chantier.clientNom}</span>
-                      {/* Indicateur d'ID pour debug */}
-                      <span className="px-2 py-1 rounded-full text-xs font-mono bg-gray-100 text-gray-600">
-                        {chantier.id}
-                      </span>
-                    </div>
-                    
-                    {/* Emails du client */}
-                    <div className="space-y-1">
-                      <div className="flex items-center space-x-2 text-xs text-gray-500">
-                        <Mail className="w-3 h-3" />
-                        <span className="truncate">{chantier.clientEmail}</span>
+                        {/* Bouton de suppression */}
+                        {chantier.id !== 'chantier-grohens-pitet' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteChantier(chantier);
+                            }}
+                            className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Supprimer le chantier"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
-                      {chantier.clientEmail2 && (
-                        <div className="flex items-center space-x-2 text-xs text-blue-600 pl-5">
-                          <Mail className="w-3 h-3" />
-                          <span className="truncate">{chantier.clientEmail2}</span>
-                        </div>
-                      )}
-                      {chantier.clientEmail3 && (
-                        <div className="flex items-center space-x-2 text-xs text-blue-600 pl-5">
-                          <Mail className="w-3 h-3" />
-                          <span className="truncate">{chantier.clientEmail3}</span>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center space-x-2 text-sm text-gray-600">
-                      <MapPin className="w-4 h-4" />
-                      <span className="line-clamp-1">{chantier.adresse}</span>
-                    </div>
-                    <div className="flex items-center space-x-2 text-sm text-gray-600">
-                      <Calendar className="w-4 h-4" />
-                      <span>
-                        {chantier.dateDebut.toLocaleDateString('fr-FR')} → {chantier.dateFinPrevue.toLocaleDateString('fr-FR')}
-                      </span>
                     </div>
                   </div>
 
-                  {chantier.budget && (
-                    <div className="pt-3 border-t border-gray-100">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Budget :</span>
-                        <span className="font-semibold text-gray-800">
-                          {chantier.budget.toLocaleString()} €
+                  <div className="space-y-3">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-800 group-hover:text-primary-600 transition-colors">
+                        {chantier.nom}
+                      </h3>
+                      <p className="text-sm text-gray-600 line-clamp-2">
+                        {chantier.description}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2 text-sm text-gray-600">
+                        <Users className="w-4 h-4" />
+                        <span>{chantier.clientNom}</span>
+                        {/* Indicateur d'ID pour debug */}
+                        <span className="px-2 py-1 rounded-full text-xs font-mono bg-gray-100 text-gray-600">
+                          {chantier.id}
+                        </span>
+                      </div>
+
+                      {/* Emails du client */}
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2 text-xs text-gray-500">
+                          <Mail className="w-3 h-3" />
+                          <span className="truncate">{chantier.clientEmail}</span>
+                        </div>
+                        {chantier.clientEmail2 && (
+                          <div className="flex items-center space-x-2 text-xs text-blue-600 pl-5">
+                            <Mail className="w-3 h-3" />
+                            <span className="truncate">{chantier.clientEmail2}</span>
+                          </div>
+                        )}
+                        {chantier.clientEmail3 && (
+                          <div className="flex items-center space-x-2 text-xs text-blue-600 pl-5">
+                            <Mail className="w-3 h-3" />
+                            <span className="truncate">{chantier.clientEmail3}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center space-x-2 text-sm text-gray-600">
+                        <MapPin className="w-4 h-4" />
+                        <span className="line-clamp-1">{chantier.adresse}</span>
+                      </div>
+                      <div className="flex items-center space-x-2 text-sm text-gray-600">
+                        <Calendar className="w-4 h-4" />
+                        <span>
+                          {chantier.dateDebut.toLocaleDateString('fr-FR')} → {chantier.dateFinPrevue.toLocaleDateString('fr-FR')}
                         </span>
                       </div>
                     </div>
-                  )}
-                </div>
 
-                {/* Flèche d'indication */}
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                  <div className="flex items-center justify-center text-primary-600 group-hover:text-primary-700 transition-colors">
-                    <span className="text-sm font-medium mr-2">Ouvrir ce chantier</span>
-                    <ArrowRight className="w-4 h-4" />
+                    {budgetValue > 0 && (
+                      <div className="pt-3 border-t border-gray-100">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600">Budget :</span>
+                          <span className="font-semibold text-gray-800">
+                            {budgetValue.toLocaleString()} €
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Flèche d'indication */}
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <div className="flex items-center justify-center text-primary-600 group-hover:text-primary-700 transition-colors">
+                      <span className="text-sm font-medium mr-2">Ouvrir ce chantier</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -870,6 +935,7 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
           onClose={() => setShowEditChantierModal(false)}
           title="Modifier le chantier"
           size="lg"
+          bodyClassName="overflow-y-auto scrollbar-hide"
         >
           <NewChantierForm
             professionalId={professionalId}
@@ -877,6 +943,80 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
             onSave={handleUpdateChantier}
             onCancel={() => setShowEditChantierModal(false)}
           />
+        </Modal>
+
+        {/* Modal configuration accès client */}
+        <Modal
+          isOpen={showConfigureClientModal}
+          onClose={handleCloseConfigureClientModal}
+          title="Configurer l'accès client"
+          size="md"
+        >
+          {configureClientState.step === 'askEmail' && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-300">
+                Saisissez ou confirmez l'email du client pour lui créer un accès à ce chantier.
+              </p>
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1">Email du client</label>
+                <input
+                  type="email"
+                  value={configureClientState.inputEmail}
+                  onChange={(e) => setConfigureClientState(prev => prev && ({ ...prev, inputEmail: e.target.value }))}
+                  className="input-field w-full"
+                  placeholder="client@email.com"
+                />
+              </div>
+              <div className="flex items-center justify-end space-x-2">
+                <button className="btn-secondary" onClick={handleCloseConfigureClientModal}>
+                  Annuler
+                </button>
+                <button className="btn-primary" onClick={handleConfigureClientConfirm}>
+                  Générer l'accès
+                </button>
+              </div>
+            </div>
+          )}
+
+          {configureClientState.step === 'creating' && (
+            <div className="flex flex-col items-center space-y-3 py-6">
+              <div className="w-10 h-10 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-gray-300">Création de l'accès client en cours...</p>
+            </div>
+          )}
+
+          {configureClientState.step === 'done' && (
+            <div className="space-y-4">
+              {configureClientState.resultType === 'created' ? (
+                <div className="bg-green-600/10 border border-green-600/30 rounded-lg p-4 space-y-2">
+                  <p className="text-sm text-green-200">
+                    ✅ Accès créé pour {configureClientState.chantier?.clientNom}
+                  </p>
+                  <div className="text-xs text-gray-200 space-y-1">
+                    <p><strong>Email :</strong> {configureClientState.inputEmail}</p>
+                    <p><strong>Mot de passe temporaire :</strong> {configureClientState.tempPassword}</p>
+                  </div>
+                  <p className="text-xs text-gray-300">
+                    Communiquez ces informations au client. Il pourra se connecter puis modifier son mot de passe.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-blue-600/10 border border-blue-600/30 rounded-lg p-4 space-y-2">
+                  <p className="text-sm text-blue-200">
+                    ℹ️ Un compte existe déjà pour {configureClientState.inputEmail}
+                  </p>
+                  <p className="text-xs text-gray-300">
+                    Demandez au client d'utiliser la fonction "Mot de passe oublié ?" avec cet email pour accéder au chantier.
+                  </p>
+                </div>
+              )}
+              <div className="flex justify-end">
+                <button className="btn-primary" onClick={handleCloseConfigureClientModal}>
+                  Fermer
+                </button>
+              </div>
+            </div>
+          )}
         </Modal>
 
         {/* Modal de confirmation de suppression */}
@@ -921,6 +1061,7 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
             </div>
           </div>
         </Modal>
+        <ChantierAlertModal />
       </div>
     </div>
   );
@@ -1032,197 +1173,197 @@ function NewChantierForm({
   return (
     <>
       <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Nom du chantier
+            </label>
+            <input
+              type="text"
+              value={formData.nom}
+              onChange={(e) => setFormData(prev => ({ ...prev, nom: e.target.value }))}
+              className="input-field w-full"
+              placeholder="Ex: Rénovation Maison Dupont"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Statut
+            </label>
+            <select
+              value={formData.statut}
+              onChange={(e) => setFormData(prev => ({ ...prev, statut: e.target.value as any }))}
+              className="input-field w-full"
+            >
+              <option value="planifie">Planifié</option>
+              <option value="en-cours">En cours</option>
+              <option value="termine">Terminé</option>
+              <option value="suspendu">Suspendu</option>
+            </select>
+          </div>
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
-            Nom du chantier
+            Description du projet
+          </label>
+          <textarea
+            value={formData.description}
+            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+            rows={3}
+            className="input-field w-full resize-none"
+            placeholder="Description des travaux à réaliser..."
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            Nom du client
           </label>
           <input
             type="text"
-            value={formData.nom}
-            onChange={(e) => setFormData(prev => ({ ...prev, nom: e.target.value }))}
+            value={formData.clientNom}
+            onChange={(e) => setFormData(prev => ({ ...prev, clientNom: e.target.value }))}
             className="input-field w-full"
-            placeholder="Ex: Rénovation Maison Dupont"
+            placeholder="Ex: M. et Mme Dupont"
           />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Email du client principal *
+            </label>
+            <input
+              type="email"
+              required
+              value={formData.clientEmail}
+              onChange={(e) => setFormData(prev => ({ ...prev, clientEmail: e.target.value }))}
+              className="input-field w-full"
+              placeholder="client@exemple.com"
+            />
+            <p className="text-xs text-blue-400 mt-1">
+              💡 Un compte client sera créé avec cet email
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Email secondaire (facultatif)
+            </label>
+            <input
+              type="email"
+              value={formData.clientEmail2}
+              onChange={(e) => setFormData(prev => ({ ...prev, clientEmail2: e.target.value }))}
+              className="input-field w-full"
+              placeholder="conjoint@exemple.com"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Accès au même chantier
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Email tertiaire (facultatif)
+            </label>
+            <input
+              type="email"
+              value={formData.clientEmail3}
+              onChange={(e) => setFormData(prev => ({ ...prev, clientEmail3: e.target.value }))}
+              className="input-field w-full"
+              placeholder="autre@exemple.com"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Accès au même chantier
+            </p>
+          </div>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
-            Statut
+            Adresse du chantier
           </label>
-          <select
-            value={formData.statut}
-            onChange={(e) => setFormData(prev => ({ ...prev, statut: e.target.value as any }))}
+          <input
+            type="text"
+            value={formData.adresse}
+            onChange={(e) => setFormData(prev => ({ ...prev, adresse: e.target.value }))}
             className="input-field w-full"
+            placeholder="123 rue de la Paix, 75001 Paris"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Date de début *
+            </label>
+            <input
+              type="date"
+              required
+              value={formData.dateDebut}
+              onChange={(e) => setFormData(prev => ({ ...prev, dateDebut: e.target.value }))}
+              className="input-field w-full"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Date de fin prévue *
+            </label>
+            <input
+              type="date"
+              required
+              value={formData.dateFinPrevue}
+              onChange={(e) => setFormData(prev => ({ ...prev, dateFinPrevue: e.target.value }))}
+              className="input-field w-full"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Budget (€)
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={formData.budget}
+              onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
+              className="input-field w-full"
+              placeholder="45000"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            Notes
+          </label>
+          <textarea
+            value={formData.notes}
+            onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+            rows={3}
+            className="input-field w-full resize-none"
+            placeholder="Notes sur le chantier..."
+          />
+        </div>
+
+        <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-700">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="btn-secondary"
           >
-            <option value="planifie">Planifié</option>
-            <option value="en-cours">En cours</option>
-            <option value="termine">Terminé</option>
-            <option value="suspendu">Suspendu</option>
-          </select>
+            Annuler
+          </button>
+          <button
+            type="submit"
+            className="btn-primary"
+          >
+            {chantier ? 'Modifier le chantier' : 'Créer le chantier'}
+          </button>
         </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
-          Description du projet
-        </label>
-        <textarea
-          value={formData.description}
-          onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-          rows={3}
-          className="input-field w-full resize-none"
-          placeholder="Description des travaux à réaliser..."
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
-          Nom du client
-        </label>
-        <input
-          type="text"
-          value={formData.clientNom}
-          onChange={(e) => setFormData(prev => ({ ...prev, clientNom: e.target.value }))}
-          className="input-field w-full"
-          placeholder="Ex: M. et Mme Dupont"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Email du client principal *
-          </label>
-          <input
-            type="email"
-            required
-            value={formData.clientEmail}
-            onChange={(e) => setFormData(prev => ({ ...prev, clientEmail: e.target.value }))}
-            className="input-field w-full"
-            placeholder="client@exemple.com"
-          />
-          <p className="text-xs text-blue-400 mt-1">
-            💡 Un compte client sera créé avec cet email
-          </p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Email secondaire (facultatif)
-          </label>
-          <input
-            type="email"
-            value={formData.clientEmail2}
-            onChange={(e) => setFormData(prev => ({ ...prev, clientEmail2: e.target.value }))}
-            className="input-field w-full"
-            placeholder="conjoint@exemple.com"
-          />
-          <p className="text-xs text-gray-400 mt-1">
-            Accès au même chantier
-          </p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Email tertiaire (facultatif)
-          </label>
-          <input
-            type="email"
-            value={formData.clientEmail3}
-            onChange={(e) => setFormData(prev => ({ ...prev, clientEmail3: e.target.value }))}
-            className="input-field w-full"
-            placeholder="autre@exemple.com"
-          />
-          <p className="text-xs text-gray-400 mt-1">
-            Accès au même chantier
-          </p>
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
-          Adresse du chantier
-        </label>
-        <input
-          type="text"
-          value={formData.adresse}
-          onChange={(e) => setFormData(prev => ({ ...prev, adresse: e.target.value }))}
-          className="input-field w-full"
-          placeholder="123 rue de la Paix, 75001 Paris"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Date de début *
-          </label>
-          <input
-            type="date"
-            required
-            value={formData.dateDebut}
-            onChange={(e) => setFormData(prev => ({ ...prev, dateDebut: e.target.value }))}
-            className="input-field w-full"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Date de fin prévue *
-          </label>
-          <input
-            type="date"
-            required
-            value={formData.dateFinPrevue}
-            onChange={(e) => setFormData(prev => ({ ...prev, dateFinPrevue: e.target.value }))}
-            className="input-field w-full"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Budget (€)
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            value={formData.budget}
-            onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
-            className="input-field w-full"
-            placeholder="45000"
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-300 mb-2">
-          Notes
-        </label>
-        <textarea
-          value={formData.notes}
-          onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-          rows={3}
-          className="input-field w-full resize-none"
-          placeholder="Notes sur le chantier..."
-        />
-      </div>
-
-      <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-700">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="btn-secondary"
-        >
-          Annuler
-        </button>
-        <button
-          type="submit"
-          className="btn-primary"
-        >
-          {chantier ? 'Modifier le chantier' : 'Créer le chantier'}
-        </button>
-      </div>
       </form>
       <AlertModalComponent />
     </>

@@ -20,10 +20,10 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
   const [chantierNom, setChantierNom] = useState('Mon Chantier');
   const [documentsFilter, setDocumentsFilter] = useState<'all' | 'en-attente' | 'valide' | 'refuse'>('all');
   const { entreprises, devis, commandes, paiements, loading, reloadData } = useChantierData(chantierId);
-  
+
   // Compter les messages non lus
   const unreadMessagesCount = useUnreadMessages(chantierId, 'client');
-  
+
   // Charger le nom du chantier
   useEffect(() => {
     const loadChantierNom = async () => {
@@ -61,7 +61,16 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
   const renderContent = () => {
     switch (currentView) {
       case 'overview':
-        return <ClientOverview stats={stats} onNavigate={setCurrentView} onNavigateToDocuments={handleNavigateToDocuments} />;
+        return (
+          <ClientOverview
+            stats={stats}
+            devis={devis}
+            commandes={commandes}
+            paiements={paiements}
+            onNavigate={setCurrentView}
+            onNavigateToDocuments={handleNavigateToDocuments}
+          />
+        );
       case 'entreprises':
         return <ClientEntreprises entreprises={entreprises} onNavigate={setCurrentView} />;
       case 'chat':
@@ -78,7 +87,16 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
       case 'paiements':
         return <ClientPaiements paiements={paiements} entreprises={entreprises} />;
       default:
-        return <ClientOverview stats={stats} entreprises={entreprises} devis={devis} onNavigate={setCurrentView} onNavigateToDocuments={handleNavigateToDocuments} />;
+        return (
+          <ClientOverview
+            stats={stats}
+            devis={devis}
+            commandes={commandes}
+            paiements={paiements}
+            onNavigate={setCurrentView}
+            onNavigateToDocuments={handleNavigateToDocuments}
+          />
+        );
     }
   };
 
@@ -142,7 +160,7 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
                   </span>
                 </button>
               )}
-              
+
               <button
                 onClick={onLogout}
                 className="flex items-center space-x-2 px-3 md:px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
@@ -238,7 +256,7 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
       )}
 
       {/* Contenu principal */}
-      <main className="max-w-7xl mx-auto px-3 md:px-4 py-4 md:py-6 max-w-full overflow-x-hidden">
+      <main className="max-w-full md:max-w-7xl mx-auto px-3 md:px-4 py-4 md:py-6 overflow-x-hidden">
         {/* Message si aucune donnée disponible */}
         {!loading && entreprises.length === 0 && devis.length === 0 && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 mb-6">
@@ -263,9 +281,94 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
   );
 }
 
+type ClientOverviewProps = {
+  stats: {
+    entreprises: number;
+    devisEnAttente: number;
+    devisValides: number;
+    devisRefuses: number;
+    commandesActives: number;
+    paiementsEnRetard: number;
+  };
+  devis: Array<{ statut: string }>;
+  commandes: Array<{ statut?: string }>;
+  paiements: Array<{ statut?: string }>;
+  onNavigate: (view: string) => void;
+  onNavigateToDocuments: (filter?: 'all' | 'en-attente' | 'valide' | 'refuse') => void;
+};
+
+type PhaseStatus = 'completed' | 'in-progress' | 'pending';
+
 // Vue d'ensemble pour le client
-function ClientOverview({ stats, onNavigate, onNavigateToDocuments }: any) {
-  const progression = Math.round((stats.devisValides / Math.max(stats.devisValides + stats.devisEnAttente, 1)) * 100);
+function ClientOverview({ stats, devis, commandes, paiements, onNavigate, onNavigateToDocuments }: ClientOverviewProps) {
+  const totalDevis = devis.length;
+  const progression = totalDevis === 0 ? 0 : Math.round((stats.devisValides / totalDevis) * 100);
+  const commandesTerminees = commandes.filter((c) => c.statut === 'terminee').length;
+  const commandesEnCours = commandes.filter((c) => c.statut === 'en-cours').length;
+  const totalCommandes = commandes.length;
+  const paiementsRegles = paiements.filter((p) => p.statut === 'regle').length;
+  const totalPaiements = paiements.length;
+
+  const getPhaseStatus = (done: number, total: number, enCours: number): PhaseStatus => {
+    if (total === 0 && done === 0 && enCours === 0) {
+      return 'pending';
+    }
+    if (total > 0 && done >= total) {
+      return 'completed';
+    }
+    if (done > 0 || enCours > 0) {
+      return 'in-progress';
+    }
+    return 'pending';
+  };
+
+  const phaseStatusLabel: Record<PhaseStatus, string> = {
+    completed: 'Terminé',
+    'in-progress': 'En cours',
+    pending: 'À venir'
+  };
+
+  const phaseBadgeClasses: Record<PhaseStatus, string> = {
+    completed: 'bg-green-500/15 text-green-200 border border-green-500/40',
+    'in-progress': 'bg-yellow-500/15 text-yellow-200 border border-yellow-500/30',
+    pending: 'bg-gray-600/30 text-gray-200 border border-gray-500/40'
+  };
+
+  const phaseBulletClasses: Record<PhaseStatus, string> = {
+    completed: 'bg-green-500 text-white',
+    'in-progress': 'bg-yellow-500 text-gray-900',
+    pending: 'bg-gray-600 text-gray-200'
+  };
+
+  const phases = [
+    {
+      id: 'devis',
+      label: 'Devis & validations',
+      status: getPhaseStatus(stats.devisValides, totalDevis, stats.devisEnAttente),
+      description:
+        totalDevis === 0
+          ? 'En attente de vos premiers devis'
+          : `${stats.devisValides}/${totalDevis} devis validés • ${stats.devisEnAttente + stats.devisRefuses} en attente ou à revoir`
+    },
+    {
+      id: 'commandes',
+      label: 'Commandes & travaux',
+      status: getPhaseStatus(commandesTerminees, totalCommandes, commandesEnCours),
+      description:
+        totalCommandes === 0
+          ? 'Les travaux démarreront après validation des devis'
+          : `${commandesTerminees}/${totalCommandes} commandes terminées${commandesEnCours ? ` • ${commandesEnCours} en cours` : ''}`
+    },
+    {
+      id: 'paiements',
+      label: 'Paiements & budget',
+      status: getPhaseStatus(paiementsRegles, totalPaiements, totalPaiements - paiementsRegles),
+      description:
+        totalPaiements === 0
+          ? 'Les paiements seront planifiés avec votre chef de projet'
+          : `${paiementsRegles}/${totalPaiements} paiements réglés${stats.paiementsEnRetard ? ` • ${stats.paiementsEnRetard} en retard` : ''}`
+    }
+  ];
 
   return (
     <div className="space-y-6">
@@ -346,7 +449,44 @@ function ClientOverview({ stats, onNavigate, onNavigateToDocuments }: any) {
         </button>
       </div>
 
-      {/* Actions rapides */}
+      {/* Progression détaillée */}
+      <div className="bg-gradient-to-br from-primary-600 via-primary-600/90 to-primary-700 rounded-xl border border-primary-400/40 p-6 text-white">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-lg font-semibold text-white">Progression du chantier</h3>
+            <p className="text-sm text-primary-100/90">
+              Visualisez les grandes étapes entre la validation des devis et la livraison de votre projet.
+            </p>
+          </div>
+        </div>
+        <div className="space-y-0">
+          {phases.map((phase, index) => {
+            const isLast = index === phases.length - 1;
+            return (
+              <div key={phase.id} className="flex items-start space-x-4">
+                <div className="flex flex-col items-center">
+                  <span
+                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold ${phaseBulletClasses[phase.status]}`}
+                  >
+                    {index + 1}
+                  </span>
+                  {!isLast && <span className="w-px flex-1 bg-white/30 mt-1" />}
+                </div>
+                <div className={`flex-1 ${isLast ? '' : 'pb-6'}`}>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-white">{phase.label}</p>
+                    <span className={`px-2 py-1 text-xs rounded-full ${phaseBadgeClasses[phase.status]}`}>
+                      {phaseStatusLabel[phase.status]}
+                    </span>
+                  </div>
+                  <p className="text-sm text-primary-100/90 mt-1">{phase.description}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {stats.devisEnAttente > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
           <div className="flex items-center space-x-3 mb-4">
