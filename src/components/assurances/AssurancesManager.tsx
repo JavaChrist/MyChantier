@@ -424,7 +424,7 @@ export function AssurancesManager() {
             )}
           </div>
         ) : (
-          <div className="space-y-3 max-h-96 overflow-y-auto">
+          <div className="space-y-3 max-h-none overflow-visible md:max-h-96 md:overflow-y-auto">
             {filteredDocuments.map((document) => {
               const secteurStyle = getSecteurStyle(document.secteur);
               const SecteurIcon = getSecteurIcon(document.secteur);
@@ -437,7 +437,7 @@ export function AssurancesManager() {
               return (
                 <div
                   key={document.id}
-                  className={`p-4 rounded-lg border border-gray-650 border-l-4 hover:bg-gray-750 transition-colors ${secteurStyle.border} ${statutBackground}`}
+                  className={`w-full p-4 rounded-lg border border-gray-650 border-l-4 hover:bg-gray-750 transition-colors ${secteurStyle.border} ${statutBackground}`}
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center space-x-3">
