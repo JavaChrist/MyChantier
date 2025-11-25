@@ -4,6 +4,34 @@ import { Modal } from '../Modal';
 import { unifiedDevisService, unifiedDocumentsService } from '../../firebase/unified-services';
 import { useAlertModal } from '../AlertModal';
 
+type SecteurColor = {
+  badgeBg: string;
+  badgeText: string;
+  borderLeft: string;
+  dot: string;
+  icon: string;
+};
+
+type DocumentGroup = {
+  entreprise: any | null;
+  documents: any[];
+};
+
+const secteurColors: Record<string, SecteurColor> = {
+  sanitaire: { badgeBg: 'bg-blue-50', badgeText: 'text-blue-700', borderLeft: 'border-l-blue-500', dot: 'bg-blue-500', icon: 'text-blue-600' },
+  electricite: { badgeBg: 'bg-yellow-50', badgeText: 'text-yellow-700', borderLeft: 'border-l-yellow-500', dot: 'bg-yellow-500', icon: 'text-yellow-600' },
+  carrelage: { badgeBg: 'bg-green-50', badgeText: 'text-green-700', borderLeft: 'border-l-green-500', dot: 'bg-green-500', icon: 'text-green-600' },
+  menuiserie: { badgeBg: 'bg-orange-50', badgeText: 'text-orange-700', borderLeft: 'border-l-orange-500', dot: 'bg-orange-500', icon: 'text-orange-600' },
+  peinture: { badgeBg: 'bg-purple-50', badgeText: 'text-purple-700', borderLeft: 'border-l-purple-500', dot: 'bg-purple-500', icon: 'text-purple-600' }
+};
+
+const getSecteurCouleur = (secteur?: string): SecteurColor => {
+  if (secteur && secteurColors[secteur]) {
+    return secteurColors[secteur];
+  }
+  return secteurColors.sanitaire;
+};
+
 interface ClientDocumentsProps {
   devis: any[];
   chantierId: string;
@@ -119,6 +147,42 @@ export function ClientDocuments({ devis, chantierId, onReload, entreprises = [],
   const devisFiltres = filterStatut === 'all'
     ? devis
     : devis.filter(d => d.statut === filterStatut);
+
+  // Regrouper les documents administratifs par entreprise
+  const documentsParEntreprise = documents.reduce<Record<string, any[]>>((acc, doc) => {
+    const key = doc.entrepriseId || 'autres';
+    if (!acc[key]) {
+      acc[key] = [];
+    }
+    acc[key].push(doc);
+    return acc;
+  }, {});
+
+  const groupesConnus: DocumentGroup[] = entreprises
+    .map(entreprise => ({
+      entreprise,
+      documents: documentsParEntreprise[entreprise.id] || []
+    }))
+    .filter(group => group.documents.length > 0);
+
+  const entreprisesRestantes = Object.keys(documentsParEntreprise)
+    .filter(key => key !== 'autres' && !entreprises.some(e => e.id === key))
+    .map(key => ({
+      entreprise: {
+        id: key,
+        nom: documentsParEntreprise[key][0]?.entrepriseNom || 'Entreprise inconnue',
+        secteurActivite: documentsParEntreprise[key][0]?.secteurActivite || 'sanitaire'
+      },
+      documents: documentsParEntreprise[key]
+    }));
+
+  const documentsGroupes: DocumentGroup[] = [
+    ...groupesConnus,
+    ...entreprisesRestantes,
+    ...(documentsParEntreprise.autres
+      ? [{ entreprise: null, documents: documentsParEntreprise.autres }]
+      : [])
+  ];
 
   return (
     <div className="space-y-6">
@@ -312,51 +376,78 @@ export function ClientDocuments({ devis, chantierId, onReload, entreprises = [],
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {documents.map((doc: any) => {
-              const entreprise = entreprises.find(e => e.id === doc.entrepriseId);
+          <div className="space-y-6">
+            {documentsGroupes.map((groupe, index) => {
+              const couleur = getSecteurCouleur(groupe.entreprise?.secteurActivite);
+              const titre = groupe.entreprise?.nom || 'Documents généraux';
+              const sousTitre = groupe.entreprise
+                ? groupe.entreprise.secteurActivite || 'Corps de métier'
+                : 'Sans entreprise associée';
+
               return (
                 <div
-                  key={doc.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all"
+                  key={groupe.entreprise?.id || `autres-${index}`}
+                  className={`bg-white border border-gray-100 rounded-xl shadow-sm border-l-4 ${couleur.borderLeft} p-4`}
                 >
-                  <div className="flex items-start space-x-3 mb-3">
-                    <div className="p-2 bg-indigo-100 rounded">
-                      <FileText className="w-5 h-5 text-indigo-600" />
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center space-x-3">
+                      <span className={`w-2.5 h-2.5 rounded-full ${couleur.dot}`} />
+                      <div>
+                        <p className="font-semibold text-gray-800">{titre}</p>
+                        <span className={`inline-flex mt-1 px-2 py-0.5 text-xs rounded-full ${couleur.badgeBg} ${couleur.badgeText}`}>
+                          {sousTitre}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <h4 className="font-medium text-gray-800">{doc.nom}</h4>
-                      <p className="text-sm text-gray-600">{doc.type}</p>
-                      {entreprise && (
-                        <p className="text-xs font-medium text-indigo-600 mt-1">
-                          🏢 {entreprise.nom}
-                        </p>
-                      )}
-                      <p className="text-xs text-gray-500 mt-1">
-                        Ajouté le {doc.dateUpload?.toLocaleDateString('fr-FR')}
-                      </p>
-                    </div>
+                    <span className="text-sm text-gray-500">
+                      {groupe.documents.length} document{groupe.documents.length > 1 ? 's' : ''}
+                    </span>
                   </div>
 
-                  {doc.description && (
-                    <p className="text-sm text-gray-600 mb-3">{doc.description}</p>
-                  )}
+                  <div className="mt-4 space-y-3">
+                    {groupe.documents.map((doc: any) => (
+                      <div
+                        key={doc.id}
+                        className="border border-gray-100 rounded-lg p-4 hover:border-gray-200 transition-colors"
+                      >
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                          <div className="flex items-start space-x-3">
+                            <div className={`p-2 rounded-lg ${couleur.badgeBg}`}>
+                              <FileText className={`w-5 h-5 ${couleur.icon}`} />
+                            </div>
+                            <div>
+                              <h4 className="font-medium text-gray-800">{doc.nom}</h4>
+                              <p className="text-sm text-gray-600">{doc.type || 'Document officiel'}</p>
+                              <p className="text-xs text-gray-500 mt-1">
+                                Ajouté le {doc.dateUpload?.toLocaleDateString('fr-FR')}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex-shrink-0">
+                            {doc.fichierUrl ? (
+                              <a
+                                href={doc.fichierUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center space-x-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg transition-colors text-sm"
+                              >
+                                <Download className="w-4 h-4" />
+                                <span>Télécharger</span>
+                              </a>
+                            ) : (
+                              <div className="px-4 py-2 bg-gray-100 text-gray-500 rounded-lg text-sm text-center">
+                                Document en préparation
+                              </div>
+                            )}
+                          </div>
+                        </div>
 
-                  {doc.fichierUrl ? (
-                    <a
-                      href={doc.fichierUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full inline-flex items-center justify-center space-x-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg transition-colors text-sm"
-                    >
-                      <Download className="w-4 h-4" />
-                      <span>Télécharger</span>
-                    </a>
-                  ) : (
-                    <div className="w-full text-center py-2 bg-gray-100 text-gray-500 rounded-lg text-sm">
-                      Document en préparation
-                    </div>
-                  )}
+                        {doc.description && (
+                          <p className="text-sm text-gray-600 mt-3">{doc.description}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               );
             })}

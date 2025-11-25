@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Shield, FileText, AlertTriangle, CheckCircle, Clock, Upload, Download, Eye, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Shield, FileText, AlertTriangle, CheckCircle, Clock, Upload, Download, Eye, Edit2, Trash2, Wrench, Zap, Hammer, Paintbrush, DoorOpen } from 'lucide-react';
 import { documentsService, uploadDocumentFile } from '../../firebase/documents';
 import { unifiedDocumentsService, type DocumentOfficiel } from '../../firebase/unified-services';
 import { useChantier } from '../../contexts/ChantierContext';
@@ -39,6 +39,48 @@ export function AssurancesManager() {
     { value: 'expire', label: 'Expiré' },
     { value: 'en-attente', label: 'En attente' }
   ];
+
+  const secteurStyles: Record<string, { border: string; iconBg: string; iconText: string }> = {
+    sanitaire: { border: 'border-l-blue-500', iconBg: 'bg-blue-600/20', iconText: 'text-blue-200' },
+    electricite: { border: 'border-l-yellow-500', iconBg: 'bg-yellow-600/20', iconText: 'text-yellow-200' },
+    carrelage: { border: 'border-l-green-500', iconBg: 'bg-green-600/20', iconText: 'text-green-200' },
+    menuiserie: { border: 'border-l-orange-500', iconBg: 'bg-orange-600/20', iconText: 'text-orange-200' },
+    peinture: { border: 'border-l-purple-500', iconBg: 'bg-purple-600/20', iconText: 'text-purple-200' }
+  };
+
+  const secteurLabels: Record<string, string> = {
+    sanitaire: 'Plomberie',
+    electricite: 'Électricité',
+    carrelage: 'Carrelage',
+    menuiserie: 'Menuiserie',
+    peinture: 'Peinture'
+  };
+
+  const getSecteurStyle = (secteur?: string) => {
+    if (!secteur) return secteurStyles.sanitaire;
+    return secteurStyles[secteur] || secteurStyles.sanitaire;
+  };
+
+  const getSecteurLabel = (secteur?: string) => {
+    if (!secteur) return secteurLabels.sanitaire;
+    return secteurLabels[secteur] || secteur;
+  };
+
+  const getSecteurIcon = (secteur?: string) => {
+    switch (secteur) {
+      case 'electricite':
+        return Zap;
+      case 'carrelage':
+        return Hammer;
+      case 'menuiserie':
+        return DoorOpen;
+      case 'peinture':
+        return Paintbrush;
+      case 'sanitaire':
+      default:
+        return Wrench;
+    }
+  };
 
   useEffect(() => {
     if (!dataLoading && entreprises.length >= 0) {
@@ -384,30 +426,35 @@ export function AssurancesManager() {
         ) : (
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {filteredDocuments.map((document) => {
+              const secteurStyle = getSecteurStyle(document.secteur);
+              const SecteurIcon = getSecteurIcon(document.secteur);
+              const statutBackground =
+                document.statut === 'expire'
+                  ? 'bg-red-600/10'
+                  : document.statut === 'bientot-expire'
+                    ? 'bg-yellow-600/10'
+                    : 'bg-gray-700';
               return (
                 <div
                   key={document.id}
-                  className={`p-4 rounded-lg border-l-4 hover:bg-gray-750 transition-colors ${document.statut === 'expire' ? 'border-red-500 bg-red-600/5' :
-                    document.statut === 'bientot-expire' ? 'border-yellow-500 bg-yellow-600/5' :
-                      'border-green-500 bg-gray-700'
-                    }`}
+                  className={`p-4 rounded-lg border border-gray-650 border-l-4 hover:bg-gray-750 transition-colors ${secteurStyle.border} ${statutBackground}`}
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-primary-600 rounded-lg">
-                        <Shield className="w-5 h-5 text-white" />
+                      <div className={`p-2 rounded-lg ${secteurStyle.iconBg}`}>
+                        <SecteurIcon className={`w-5 h-5 ${secteurStyle.iconText}`} />
                       </div>
                       <div>
                         <h4 className="font-medium text-gray-100">{document.nom}</h4>
                         <p className="text-sm text-gray-300">{document.entrepriseNom}</p>
-                        <p className="text-xs text-gray-400 capitalize">{document.secteur}</p>
+                        <p className="text-xs text-gray-400">{getSecteurLabel(document.secteur)}</p>
                       </div>
                     </div>
 
                     <div className="flex items-center space-x-2">
                       <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${getStatutColor(document.statut)}`}>
                         {getStatutIcon(document.statut)}
-                        <span>{document.statut}</span>
+                        <span className="capitalize">{document.statut}</span>
                       </div>
 
                       <div className="flex space-x-1">

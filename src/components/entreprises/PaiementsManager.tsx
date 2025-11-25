@@ -388,14 +388,44 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
 
   // Calculs des totaux
   const totaux = {
-    total: paiements.reduce((sum, p) => sum + p.montant, 0),
     regle: paiements.filter(p => p.statut === 'regle').reduce((sum, p) => sum + p.montant, 0),
-    prevu: paiements.filter(p => p.statut === 'prevu').reduce((sum, p) => sum + p.montant, 0),
-    enRetard: paiements.filter(p => {
-      const isEnRetard = p.statut === 'prevu' && p.datePrevue < new Date();
-      return isEnRetard;
-    }).reduce((sum, p) => sum + p.montant, 0)
+    prevu: paiements.filter(p => p.statut === 'prevu').reduce((sum, p) => sum + p.montant, 0)
   };
+
+  // Total cumulé des commandes de l'entreprise et restant dû
+  const totalCommandes = commandes.reduce((sum, commande) => sum + (commande.montantTTC || 0), 0);
+  const restantDu = Math.max(0, totalCommandes - totaux.regle);
+
+  const summaryCards = [
+    {
+      label: 'Total commandes',
+      value: totalCommandes.toLocaleString(),
+      icon: DollarSign,
+      iconBg: 'bg-blue-600',
+      amountClass: 'text-gray-100'
+    },
+    {
+      label: 'Réglé',
+      value: totaux.regle.toLocaleString(),
+      icon: Check,
+      iconBg: 'bg-green-600',
+      amountClass: 'text-green-400'
+    },
+    {
+      label: 'Prévu',
+      value: totaux.prevu.toLocaleString(),
+      icon: Clock,
+      iconBg: 'bg-yellow-600',
+      amountClass: 'text-yellow-400'
+    },
+    {
+      label: 'En cours',
+      value: restantDu.toLocaleString(),
+      icon: CreditCard,
+      iconBg: 'bg-indigo-600',
+      amountClass: 'text-blue-300'
+    }
+  ];
 
   if (loading) {
     return (
@@ -451,53 +481,20 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
 
       {/* Résumé des totaux */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="card-mobile">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-blue-600 rounded-lg">
-              <DollarSign className="w-5 h-5 text-white" />
+        {summaryCards.map(card => {
+          const Icon = card.icon;
+          return (
+            <div key={card.label} className="card-mobile">
+              <div className="flex flex-col items-center text-center space-y-2">
+                <div className={`p-2 rounded-lg ${card.iconBg}`}>
+                  <Icon className="w-5 h-5 text-white" />
+                </div>
+                <p className="text-gray-400 text-xs">{card.label}</p>
+                <p className={`text-lg font-bold ${card.amountClass}`}>{card.value} €</p>
+              </div>
             </div>
-            <div>
-              <p className="text-gray-400 text-xs">Total</p>
-              <p className="text-lg font-bold text-gray-100">{totaux.total.toLocaleString()} €</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card-mobile">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-green-600 rounded-lg">
-              <Check className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="text-gray-400 text-xs">Réglé</p>
-              <p className="text-lg font-bold text-green-400">{totaux.regle.toLocaleString()} €</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card-mobile">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-yellow-600 rounded-lg">
-              <Clock className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="text-gray-400 text-xs">Prévu</p>
-              <p className="text-lg font-bold text-yellow-400">{totaux.prevu.toLocaleString()} €</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card-mobile">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-red-600 rounded-lg">
-              <AlertTriangle className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="text-gray-400 text-xs">En retard</p>
-              <p className="text-lg font-bold text-red-400">{totaux.enRetard.toLocaleString()} €</p>
-            </div>
-          </div>
-        </div>
+          );
+        })}
       </div>
 
       {/* Filtre par statut */}
