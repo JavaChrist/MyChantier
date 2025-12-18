@@ -4,7 +4,8 @@ import { db, firebaseConfig } from './config';
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 const SERVICE_WORKER_PATH = '/firebase-messaging-sw.js';
-const SERVICE_WORKER_SCOPE = '/firebase-cloud-messaging-push-scope';
+// Le scope doit être égal ou au-dessus du chemin du service worker. Ici on le place à la racine.
+const SERVICE_WORKER_SCOPE = '/';
 
 async function getMessagingInstance() {
   if (typeof window === 'undefined') {
