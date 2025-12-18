@@ -12,7 +12,7 @@
     "type-check": "tsc --noEmit"
   },
   "devDependencies": {
-    "@types/react": "^19.2.2",
+    "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.1",
     "@vitejs/plugin-react": "^5.0.4",
     "autoprefixer": "^10.4.21",
@@ -26,8 +26,8 @@
     "@types/node": "^24.7.2",
     "firebase": "^12.4.0",
     "lucide-react": "^0.545.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
     "vite-plugin-pwa": "^1.1.0",
     "workbox-cli": "^7.3.0",
     "workbox-webpack-plugin": "^7.3.0"

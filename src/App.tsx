@@ -25,6 +25,7 @@ import './utils/cleanupDevis';
 import './utils/cleanupEtapes';
 import './utils/addSecondaryEmail';
 import { GlobalAlertListener } from './components/GlobalAlertListener';
+import { useChatNotifications } from './hooks/useChatNotifications';
 
 function AppContent({ userProfile, onLogout }: { userProfile: any; onLogout: () => void }) {
   const [currentView, setCurrentView] = useState('dashboard');
@@ -170,6 +171,8 @@ function AuthenticatedApp({
   userProfile: any;
   onLogout: () => void;
 }) {
+  useChatNotifications(userProfile);
+
   // Redirection selon le rôle
   if (userProfile?.role === 'client') {
     return <ClientApp userProfile={userProfile} onLogout={onLogout} />;
