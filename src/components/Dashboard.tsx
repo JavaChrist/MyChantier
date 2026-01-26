@@ -187,7 +187,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       {/* Statistiques */}
       <div className="mobile-grid">
         {chantierActuel && (
-          <div className="card-mobile hover:bg-gray-750 cursor-pointer transition-colors">
+          <div
+            className="card-mobile hover:bg-gray-750 cursor-pointer transition-colors"
+            onClick={() => handleCardClick('paiements')}
+          >
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-teal-600 rounded-lg">
                 <CreditCard className="w-5 h-5 md:w-6 md:h-6 text-white" />

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Navigation } from './components/Navigation';
 import { MobileNavigation } from './components/MobileNavigation';
@@ -18,6 +18,8 @@ import { ChantierHeader } from './components/chantiers/ChantierHeader';
 import { LoginForm } from './components/auth/LoginForm';
 import { useAuth } from './hooks/useAuth';
 import { ClientInterface } from './components/client/ClientInterface';
+import { ClientChantierSelector } from './components/chantiers/ClientChantierSelector';
+import type { Chantier } from './firebase/chantiers';
 // Importer les outils de diagnostic et nettoyage
 import './utils/migrateDevisToV2';
 import './utils/fixDevisEntreprises';
@@ -184,11 +186,36 @@ function AuthenticatedApp({
 
 // Interface client (accès à UN seul chantier)
 function ClientApp({ userProfile, onLogout }: { userProfile: any; onLogout: () => void }) {
-  // Le client n'a accès qu'à SON chantier spécifique
-  const clientChantierId = userProfile?.chantierId;
+  // Le client peut avoir accès à plusieurs chantiers
+  const clientChantierIds: string[] = Array.isArray(userProfile?.chantierIds) && userProfile.chantierIds.length > 0
+    ? userProfile.chantierIds
+    : userProfile?.chantierId
+      ? [userProfile.chantierId]
+      : [];
+  const storageKey = userProfile?.uid ? `client-chantier-${userProfile.uid}` : null;
+  const [selectedChantierId, setSelectedChantierId] = useState<string | null>(() => {
+    if (!storageKey) return null;
+    return localStorage.getItem(storageKey);
+  });
+
+  useEffect(() => {
+    if (clientChantierIds.length === 1) {
+      setSelectedChantierId(clientChantierIds[0]);
+      if (storageKey) {
+        localStorage.setItem(storageKey, clientChantierIds[0]);
+      }
+      return;
+    }
+    if (selectedChantierId && !clientChantierIds.includes(selectedChantierId)) {
+      setSelectedChantierId(null);
+      if (storageKey) {
+        localStorage.removeItem(storageKey);
+      }
+    }
+  }, [clientChantierIds, selectedChantierId, storageKey]);
 
   // Si le client n'a pas de chantier assigné, afficher une erreur
-  if (!clientChantierId) {
+  if (clientChantierIds.length === 0) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
         <div className="max-w-md w-full text-center space-y-6">
@@ -215,15 +242,39 @@ function ClientApp({ userProfile, onLogout }: { userProfile: any; onLogout: () =
     );
   }
 
-  // Tous les chantiers sont maintenant valides avec la structure V2
-  // Plus besoin de vérifier si le chantier existe, la structure V2 gère cela automatiquement
+  const handleSelectChantier = (chantier: Chantier) => {
+    if (!chantier.id) return;
+    setSelectedChantierId(chantier.id);
+    if (storageKey) {
+      localStorage.setItem(storageKey, chantier.id);
+    }
+  };
+
+  const handleChangeChantier = () => {
+    setSelectedChantierId(null);
+    if (storageKey) {
+      localStorage.removeItem(storageKey);
+    }
+  };
+
+  if (clientChantierIds.length > 1 && !selectedChantierId) {
+    return (
+      <ClientChantierSelector
+        chantierIds={clientChantierIds}
+        clientName={userProfile?.displayName || 'Client'}
+        onSelect={handleSelectChantier}
+        onLogout={onLogout}
+      />
+    );
+  }
 
   // Les clients n'ont PAS besoin de ChantierProvider car leur chantier est fixe
   return (
     <ClientInterface
       userProfile={userProfile}
-      chantierId={clientChantierId}
+      chantierId={selectedChantierId || clientChantierIds[0]}
       onLogout={onLogout}
+      onChangeChantier={clientChantierIds.length > 1 ? handleChangeChantier : undefined}
     />
   );
 }

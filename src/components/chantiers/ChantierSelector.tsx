@@ -509,7 +509,8 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
         email: clientEmail,
         displayName: chantier.clientNom,
         role: 'client',
-        chantierId: chantier.id
+        chantierId: chantier.id,
+        chantierIds: chantier.id ? [chantier.id] : undefined
       });
 
       await signOut(auth);

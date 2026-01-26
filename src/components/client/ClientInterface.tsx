@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import { MessageCircle, Calendar, FileText, CreditCard, LogOut, User, Clock, CheckCircle, AlertCircle, Menu, X } from 'lucide-react';
+import { MessageCircle, Calendar, FileText, CreditCard, LogOut, User, Clock, CheckCircle, AlertCircle, Menu, X, Building2 } from 'lucide-react';
 import { useChantierData } from '../../hooks/useChantierData';
+import { unifiedBudgetService } from '../../firebase/unified-services';
+import type { BudgetPrevisionnel } from '../../firebase/unified-services';
 import { useUnreadMessages } from '../../hooks/useUnreadMessages';
 import { ClientChat } from './ClientChat';
 import { ClientEntreprises } from './ClientEntreprises';
@@ -12,13 +14,16 @@ interface ClientInterfaceProps {
   userProfile: any;
   chantierId: string;
   onLogout: () => void;
+  onChangeChantier?: () => void;
 }
 
-export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInterfaceProps) {
+export function ClientInterface({ userProfile, chantierId, onLogout, onChangeChantier }: ClientInterfaceProps) {
   const [currentView, setCurrentView] = useState('overview');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [chantierNom, setChantierNom] = useState('Mon Chantier');
   const [documentsFilter, setDocumentsFilter] = useState<'all' | 'en-attente' | 'valide' | 'refuse'>('all');
+  const [budgets, setBudgets] = useState<BudgetPrevisionnel[]>([]);
+  const [budgetLoading, setBudgetLoading] = useState(false);
   const { entreprises, devis, commandes, paiements, loading, reloadData } = useChantierData(chantierId);
 
   // Compter les messages non lus
@@ -39,6 +44,27 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
       }
     };
     loadChantierNom();
+  }, [chantierId]);
+
+  // Charger le budget actif pour l'espace client
+  useEffect(() => {
+    const loadBudgets = async () => {
+      try {
+        if (!chantierId) {
+          setBudgets([]);
+          return;
+        }
+        setBudgetLoading(true);
+        const budgetsData = await unifiedBudgetService.getByChantier(chantierId);
+        setBudgets(budgetsData);
+      } catch (error) {
+        console.error('Erreur chargement budgets client:', error);
+        setBudgets([]);
+      } finally {
+        setBudgetLoading(false);
+      }
+    };
+    loadBudgets();
   }, [chantierId]);
 
   // Système de chargement des données via useChantierData
@@ -67,6 +93,8 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
             devis={devis}
             commandes={commandes}
             paiements={paiements}
+            budgetActuel={budgets.find(b => b.statut === 'actif') || null}
+            budgetLoading={budgetLoading}
             onNavigate={setCurrentView}
             onNavigateToDocuments={handleNavigateToDocuments}
           />
@@ -93,6 +121,8 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
             devis={devis}
             commandes={commandes}
             paiements={paiements}
+            budgetActuel={budgets.find(b => b.statut === 'actif') || null}
+            budgetLoading={budgetLoading}
             onNavigate={setCurrentView}
             onNavigateToDocuments={handleNavigateToDocuments}
           />
@@ -158,6 +188,17 @@ export function ClientInterface({ userProfile, chantierId, onLogout }: ClientInt
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[1.25rem] h-5 px-1 flex items-center justify-center">
                     {unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}
                   </span>
+                </button>
+              )}
+
+              {onChangeChantier && (
+                <button
+                  onClick={onChangeChantier}
+                  className="flex items-center space-x-2 px-3 md:px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="Changer de chantier"
+                >
+                  <Building2 className="w-4 h-4" />
+                  <span className="hidden md:inline">Changer de chantier</span>
                 </button>
               )}
 
@@ -292,7 +333,9 @@ type ClientOverviewProps = {
   };
   devis: Array<{ statut: string }>;
   commandes: Array<{ statut?: string }>;
-  paiements: Array<{ statut?: string }>;
+  paiements: Array<{ statut?: string; montant: number }>;
+  budgetActuel: BudgetPrevisionnel | null;
+  budgetLoading: boolean;
   onNavigate: (view: string) => void;
   onNavigateToDocuments: (filter?: 'all' | 'en-attente' | 'valide' | 'refuse') => void;
 };
@@ -300,7 +343,16 @@ type ClientOverviewProps = {
 type PhaseStatus = 'completed' | 'in-progress' | 'pending';
 
 // Vue d'ensemble pour le client
-function ClientOverview({ stats, devis, commandes, paiements, onNavigate, onNavigateToDocuments }: ClientOverviewProps) {
+function ClientOverview({
+  stats,
+  devis,
+  commandes,
+  paiements,
+  budgetActuel,
+  budgetLoading,
+  onNavigate,
+  onNavigateToDocuments
+}: ClientOverviewProps) {
   const totalDevis = devis.length;
   const progression = totalDevis === 0 ? 0 : Math.round((stats.devisValides / totalDevis) * 100);
   const commandesTerminees = commandes.filter((c) => c.statut === 'terminee').length;
@@ -308,6 +360,11 @@ function ClientOverview({ stats, devis, commandes, paiements, onNavigate, onNavi
   const totalCommandes = commandes.length;
   const paiementsRegles = paiements.filter((p) => p.statut === 'regle').length;
   const totalPaiements = paiements.length;
+  const totalEngage = paiements.reduce((sum, p) => sum + (p.montant || 0), 0);
+  const totalRegle = paiements
+    .filter((p) => p.statut === 'regle')
+    .reduce((sum, p) => sum + (p.montant || 0), 0);
+  const resteDisponible = budgetActuel ? budgetActuel.montantActuel - totalEngage : null;
 
   const getPhaseStatus = (done: number, total: number, enCours: number): PhaseStatus => {
     if (total === 0 && done === 0 && enCours === 0) {
@@ -384,6 +441,59 @@ function ClientOverview({ stats, devis, commandes, paiements, onNavigate, onNavi
           />
         </div>
         <p className="text-sm text-primary-100">{progression}% des devis validés</p>
+
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-semibold text-white">Budget</p>
+            {!budgetLoading && budgetActuel && (
+              <p className="text-xs text-primary-100">
+                {Math.min((totalEngage / budgetActuel.montantActuel) * 100, 100).toFixed(1)}% utilisé
+              </p>
+            )}
+          </div>
+          {budgetLoading ? (
+            <p className="text-sm text-primary-100">Chargement du budget...</p>
+          ) : budgetActuel ? (
+            <>
+              <div className="bg-white/20 rounded-full h-3 mb-3">
+                <div
+                  className="bg-emerald-200 rounded-full h-3 transition-all duration-500"
+                  style={{
+                    width: `${Math.min((totalEngage / budgetActuel.montantActuel) * 100, 100)}%`
+                  }}
+                />
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-lg font-bold text-white">
+                    {budgetActuel.montantActuel.toLocaleString()} €
+                  </p>
+                  <p className="text-xs text-primary-100">Budget actuel</p>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-white">
+                    {totalEngage.toLocaleString()} €
+                  </p>
+                  <p className="text-xs text-primary-100">Total engagé</p>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-white">
+                    {totalRegle.toLocaleString()} €
+                  </p>
+                  <p className="text-xs text-primary-100">Déjà payé</p>
+                </div>
+                <div>
+                  <p className={`text-lg font-bold ${resteDisponible !== null && resteDisponible < 0 ? 'text-red-200' : 'text-white'}`}>
+                    {(resteDisponible ?? 0).toLocaleString()} €
+                  </p>
+                  <p className="text-xs text-primary-100">Reste disponible</p>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-primary-100">Aucun budget actif pour le moment.</p>
+          )}
+        </div>
       </div>
 
       {/* Statistiques */}
