@@ -360,7 +360,9 @@ function ClientOverview({
   const totalCommandes = commandes.length;
   const paiementsRegles = paiements.filter((p) => p.statut === 'regle').length;
   const totalPaiements = paiements.length;
-  const totalEngage = paiements.reduce((sum, p) => sum + (p.montant || 0), 0);
+  const totalEngage = devis
+    .filter((d) => d.statut === 'valide')
+    .reduce((sum, d: any) => sum + (d.montantTTC || 0), 0);
   const totalRegle = paiements
     .filter((p) => p.statut === 'regle')
     .reduce((sum, p) => sum + (p.montant || 0), 0);
