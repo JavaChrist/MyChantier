@@ -9,7 +9,7 @@ import { useAlertModal } from '../AlertModal';
 
 export function PaiementsGlobaux() {
   const { chantierId, chantierActuel, setBudgetActuel } = useChantier();
-  const { entreprises, paiements: paiementsData, loading: dataLoading, reloadData } = useChantierData(chantierId);
+  const { entreprises, devis, paiements: paiementsData, loading: dataLoading, reloadData } = useChantierData(chantierId);
 
   const [paiements, setPaiements] = useState<(Paiement & { entrepriseNom: string; secteur: string })[]>([]);
   const [budgets, setBudgets] = useState<BudgetPrevisionnel[]>([]);
@@ -159,9 +159,13 @@ export function PaiementsGlobaux() {
     }
   };
 
+  const totalEngageDevis = devis
+    .filter(d => d.statut === 'valide')
+    .reduce((sum, d) => sum + (d.montantTTC || 0), 0);
+
   // Calculs globaux
   const totaux = {
-    total: paiements.reduce((sum, p) => sum + p.montant, 0),
+    total: totalEngageDevis,
     regle: paiements.filter(p => p.statut === 'regle').reduce((sum, p) => sum + p.montant, 0),
     prevu: paiements.filter(p => p.statut === 'prevu').reduce((sum, p) => sum + p.montant, 0),
     enRetard: paiements.filter(p => {
