@@ -35,19 +35,23 @@ const getEmptyFormData = (chantierId: string): EntrepriseFormData => ({
   chantierId
 });
 
+const SECTEURS = [
+  { value: 'sanitaire', label: 'Sanitaire' },
+  { value: 'electricite', label: 'Électricité' },
+  { value: 'carrelage', label: 'Carrelage' },
+  { value: 'menuiserie', label: 'Menuiserie' },
+  { value: 'peinture', label: 'Peinture' }
+];
+
 export function EntrepriseForm({ chantierId, entreprise, onSave, onCancel }: EntrepriseFormProps) {
   const [formData, setFormData] = useState<EntrepriseFormData>(() => getEmptyFormData(chantierId));
-
-  const secteurs = [
-    { value: 'sanitaire', label: 'Sanitaire' },
-    { value: 'electricite', label: 'Électricité' },
-    { value: 'carrelage', label: 'Carrelage' },
-    { value: 'menuiserie', label: 'Menuiserie' },
-    { value: 'peinture', label: 'Peinture' }
-  ];
+  const [customSecteur, setCustomSecteur] = useState('');
+  const secteurValues = SECTEURS.map(s => s.value);
 
   useEffect(() => {
     if (entreprise) {
+      const isCustom = !secteurValues.includes(entreprise.secteurActivite);
+      setCustomSecteur(isCustom ? entreprise.secteurActivite : '');
       setFormData({
         nom: entreprise.nom,
         siret: entreprise.siret || '',
@@ -64,6 +68,7 @@ export function EntrepriseForm({ chantierId, entreprise, onSave, onCancel }: Ent
         chantierId: entreprise.chantierId
       });
     } else {
+      setCustomSecteur('');
       setFormData(getEmptyFormData(chantierId));
     }
   }, [entreprise, chantierId]);
@@ -125,16 +130,37 @@ export function EntrepriseForm({ chantierId, entreprise, onSave, onCancel }: Ent
                 Secteur d'activité
               </label>
               <select
-                value={formData.secteurActivite}
-                onChange={(e) => handleInputChange('secteurActivite', e.target.value)}
+                value={secteurValues.includes(formData.secteurActivite) ? formData.secteurActivite : 'autre'}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === 'autre') {
+                    handleInputChange('secteurActivite', customSecteur || '');
+                  } else {
+                    setCustomSecteur('');
+                    handleInputChange('secteurActivite', value);
+                  }
+                }}
                 className="input-field w-full"
               >
-                {secteurs.map(secteur => (
+                {SECTEURS.map(secteur => (
                   <option key={secteur.value} value={secteur.value}>
                     {secteur.label}
                   </option>
                 ))}
+                <option value="autre">Autre...</option>
               </select>
+              {!secteurValues.includes(formData.secteurActivite) && (
+                <input
+                  type="text"
+                  value={customSecteur}
+                  onChange={(e) => {
+                    setCustomSecteur(e.target.value);
+                    handleInputChange('secteurActivite', e.target.value);
+                  }}
+                  className="input-field w-full mt-2"
+                  placeholder="Saisir un secteur personnalisé"
+                />
+              )}
             </div>
           </div>
 

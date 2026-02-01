@@ -16,7 +16,7 @@ export interface Entreprise {
   id?: string;
   nom: string;
   siret?: string;
-  secteurActivite: 'sanitaire' | 'electricite' | 'carrelage' | 'menuiserie' | 'peinture';
+  secteurActivite: string;
   contact: {
     nom: string;
     telephone: string;

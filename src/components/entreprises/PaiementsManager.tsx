@@ -15,6 +15,7 @@ interface PaiementsManagerProps {
 export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: PaiementsManagerProps) {
   const [paiements, setPaiements] = useState<Paiement[]>([]);
   const [commandes, setCommandes] = useState<Commande[]>([]);
+  const [devis, setDevis] = useState<Devis[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [selectedPaiement, setSelectedPaiement] = useState<Paiement | null>(null);
@@ -64,13 +65,15 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
       console.log(`🔍 Chargement paiements pour entreprise ${entrepriseId} dans chantier ${chantierId}`);
 
       // Charger TOUS les paiements et commandes du chantier puis filtrer par entreprise
-      const [allPaiements, allCommandes] = await Promise.all([
+      const [allPaiements, allCommandes, allDevis] = await Promise.all([
         unifiedPaiementsService.getByChantier(chantierId),
-        unifiedCommandesService.getByChantier(chantierId)
+        unifiedCommandesService.getByChantier(chantierId),
+        unifiedDevisService.getByChantier(chantierId)
       ]);
 
       const paiementsEntreprise = allPaiements.filter(p => p.entrepriseId === entrepriseId);
       const commandesData = allCommandes.filter(c => c.entrepriseId === entrepriseId);
+      const devisEntreprise = allDevis.filter(d => d.entrepriseId === entrepriseId);
 
       console.log(`✅ ${paiementsEntreprise.length} paiements chargés pour cette entreprise`);
 
@@ -78,11 +81,13 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
       // Filtrer seulement les commandes actives (pas annulées)
       const commandesActives = commandesData.filter(cmd => cmd.statut !== 'annulee');
       setCommandes(commandesActives);
+      setDevis(devisEntreprise);
     } catch (error) {
       console.error('Erreur lors du chargement:', error);
       // Données de test en cas d'erreur
       setPaiements([]);
       setCommandes([]);
+      setDevis([]);
     } finally {
       setLoading(false);
     }
@@ -427,6 +432,100 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
     }
   ];
 
+  const devisValides = devis.filter(d => d.statut === 'valide');
+
+  const getMontant = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+  const isClose = (a: number, b: number) => Math.abs(a - b) < 0.01;
+  const normalizeText = (value?: string) => (value || '').toLowerCase();
+  const findCommandeForDevis = (devisLie: Devis) => {
+    const direct = commandes.find(c => c.devisId === devisLie.id);
+    if (direct) {
+      return { commande: direct, matchedByFallback: false };
+    }
+
+    const montantRef = getMontant(devisLie.montantTTC) || getMontant(devisLie.montantHT);
+    const devisNumero = normalizeText(devisLie.numero);
+    const devisPrestation = normalizeText(devisLie.prestationNom);
+
+    // 1) Essayer de relier via un paiement existant (notes contenant le devis)
+    const paiementAssocie = paiements.find((p) => {
+      if (!p.notes) return false;
+      const notes = normalizeText(p.notes);
+      if (devisNumero && notes.includes(devisNumero)) return true;
+      if (devisPrestation && notes.includes(devisPrestation)) return true;
+      return false;
+    });
+    if (paiementAssocie?.commandeId) {
+      const commandeParPaiement = commandes.find(c => c.id === paiementAssocie.commandeId);
+      if (commandeParPaiement) {
+        return { commande: commandeParPaiement, matchedByFallback: true };
+      }
+    }
+
+    // 2) Essayer par prestation (si unique)
+    if (devisLie.prestationNom) {
+      const matchesPrestation = commandes.filter(c => c.prestationNom === devisLie.prestationNom);
+      if (matchesPrestation.length === 1) {
+        return { commande: matchesPrestation[0], matchedByFallback: true };
+      }
+    }
+
+    // 3) Essayer par montant + prestation si possible
+    const matches = commandes.filter((c) => {
+      if (devisLie.prestationNom && c.prestationNom !== devisLie.prestationNom) {
+        return false;
+      }
+      if (montantRef > 0) {
+        const montantCmd = getMontant(c.montantTTC) || getMontant(c.montantHT);
+        return isClose(montantCmd, montantRef);
+      }
+      return false;
+    });
+
+    if (matches.length === 1) {
+      return { commande: matches[0], matchedByFallback: true };
+    }
+
+    return { commande: undefined, matchedByFallback: false };
+  };
+
+  const devisResume = devisValides
+    .map((devisLie) => {
+      const { commande: commandeLiee, matchedByFallback } = findCommandeForDevis(devisLie);
+      const montantDevis =
+        getMontant(devisLie.montantTTC) ||
+        getMontant(devisLie.montantHT) ||
+        getMontant(commandeLiee?.montantTTC) ||
+        getMontant(commandeLiee?.montantHT);
+      const paiementsCommande = commandeLiee
+        ? paiements.filter(p => p.commandeId === commandeLiee.id)
+        : [];
+      const acompte = paiementsCommande
+        .filter(p => p.type === 'acompte')
+        .reduce((sum, p) => sum + p.montant, 0);
+      const situation = paiementsCommande
+        .filter(p => p.type === 'situation')
+        .reduce((sum, p) => sum + p.montant, 0);
+      const soldeFinal = paiementsCommande
+        .filter(p => p.type === 'solde')
+        .reduce((sum, p) => sum + p.montant, 0);
+      const totalPaiements = acompte + situation + soldeFinal;
+      const resteAPayer = Math.max(0, montantDevis - totalPaiements);
+
+      return {
+        id: devisLie.id || commandeLiee?.id || `${devisLie.numero || devisLie.prestationNom}`,
+        devisNumero: devisLie.numero || commandeLiee?.numero,
+        prestationNom: devisLie.prestationNom || commandeLiee?.prestationNom,
+        montantDevis,
+        acompte,
+        situation,
+        soldeFinal,
+        resteAPayer,
+        hasCommande: !!commandeLiee
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => !!item);
+
   if (loading) {
     return (
       <>
@@ -496,6 +595,63 @@ export function PaiementsManager({ entrepriseId, entrepriseName, chantierId }: P
           );
         })}
       </div>
+
+      {/* Acomptes & solde par devis */}
+      {devisResume.length > 0 && (
+        <div className="card">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-md font-semibold text-gray-100">Acomptes et solde par devis</h4>
+            <span className="text-xs text-gray-400">{devisResume.length} devis</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {devisResume.map((item) => (
+              <div key={item.id} className="bg-gray-700 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-100">
+                      {item.devisNumero || 'Devis'} • {item.prestationNom}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Montant devis: {item.montantDevis.toLocaleString()} €
+                    </p>
+                  </div>
+                  <div className="p-2 bg-blue-600/20 rounded-lg">
+                    <FileText className="w-4 h-4 text-blue-400" />
+                  </div>
+                </div>
+                {!item.hasCommande && (
+                  <p className="text-xs text-yellow-300 mb-3">
+                    Aucune commande liée pour le moment.
+                  </p>
+                )}
+                {item.montantDevis === 0 && (
+                  <p className="text-xs text-yellow-300 mb-3">
+                    Montant du devis non renseigné.
+                  </p>
+                )}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between bg-blue-600/10 border border-blue-600/20 rounded-lg px-3 py-2">
+                    <p className="text-xs text-blue-200">Acompte</p>
+                    <p className="text-sm font-bold text-blue-200">{item.acompte.toLocaleString()} €</p>
+                  </div>
+                  <div className="flex items-center justify-between bg-orange-600/10 border border-orange-600/20 rounded-lg px-3 py-2">
+                    <p className="text-xs text-orange-200">Situation</p>
+                    <p className="text-sm font-bold text-orange-200">{item.situation.toLocaleString()} €</p>
+                  </div>
+                  <div className="flex items-center justify-between bg-green-600/10 border border-green-600/20 rounded-lg px-3 py-2">
+                    <p className="text-xs text-green-200">Solde final</p>
+                    <p className="text-sm font-bold text-green-200">{item.soldeFinal.toLocaleString()} €</p>
+                  </div>
+                  <div className="flex items-center justify-between bg-gray-600/10 border border-gray-600/20 rounded-lg px-3 py-2">
+                    <p className="text-xs text-gray-200">Reste à payer</p>
+                    <p className="text-sm font-bold text-gray-100">{item.resteAPayer.toLocaleString()} €</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Filtre par statut */}
       <div className="card">
@@ -755,6 +911,7 @@ type PaiementFormData = {
   commandeId: string;
   type: Paiement['type'];
   montant: string;
+  pourcentage: string;
   datePrevue: string;
   dateReglement: string;
   statut: Paiement['statut'];
@@ -776,6 +933,7 @@ function PaiementForm({
     commandeId: '',
     type: 'acompte',
     montant: '',
+    pourcentage: '',
     datePrevue: '',
     dateReglement: '',
     statut: 'prevu',
@@ -788,6 +946,7 @@ function PaiementForm({
         commandeId: paiement.commandeId,
         type: paiement.type,
         montant: paiement.montant.toString(),
+        pourcentage: '',
         datePrevue: paiement.datePrevue.toISOString().split('T')[0],
         dateReglement: paiement.dateReglement?.toISOString().split('T')[0] || '',
         statut: paiement.statut,
@@ -822,26 +981,33 @@ function PaiementForm({
   const handleCommandeChange = (commandeId: string) => {
     const commande = commandes.find(c => c.id === commandeId);
     if (commande) {
-      // Suggérer un montant basé sur le type de paiement
-      let montantSuggere = 0;
-      switch (formData.type) {
-        case 'acompte':
-          montantSuggere = Math.round(commande.montantTTC * 0.3); // 30% d'acompte
-          break;
-        case 'situation':
-          montantSuggere = Math.round(commande.montantTTC * 0.4); // 40% en situation
-          break;
-        case 'solde':
-          montantSuggere = Math.round(commande.montantTTC * 0.3); // 30% de solde
-          break;
-      }
+      const commandeMontant = commande.montantTTC || 0;
+      const pourcentage = parseFloat(formData.pourcentage);
+      const montantSuggere = Number.isFinite(pourcentage)
+        ? Math.round(commandeMontant * (pourcentage / 100) * 100) / 100
+        : null;
 
       setFormData(prev => ({
         ...prev,
         commandeId,
-        montant: montantSuggere.toString()
+        montant: montantSuggere !== null ? montantSuggere.toString() : prev.montant
       }));
     }
+  };
+
+  const handlePourcentageChange = (value: string) => {
+    const pourcentage = parseFloat(value);
+    const commande = commandes.find(c => c.id === formData.commandeId);
+    const commandeMontant = commande?.montantTTC || 0;
+    const montantSuggere = Number.isFinite(pourcentage)
+      ? Math.round(commandeMontant * (pourcentage / 100) * 100) / 100
+      : null;
+
+    setFormData(prev => ({
+      ...prev,
+      pourcentage: value,
+      montant: montantSuggere !== null ? montantSuggere.toString() : prev.montant
+    }));
   };
 
   return (
@@ -871,7 +1037,7 @@ function PaiementForm({
         </select>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
             Type de paiement *
@@ -882,20 +1048,34 @@ function PaiementForm({
             onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as Paiement['type'] }))}
             className="input-field w-full"
           >
-            <option value="acompte">Acompte (30%)</option>
-            <option value="situation">Situation (40%)</option>
-            <option value="solde">Solde final (30%)</option>
+            <option value="acompte">Acompte</option>
+            <option value="situation">Situation</option>
+            <option value="solde">Solde final</option>
           </select>
         </div>
-
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            Pourcentage (%)
+          </label>
+          <input
+            type="text"
+            inputMode="decimal"
+            pattern="^[0-9]+([.,][0-9]{0,2})?$"
+            value={formData.pourcentage}
+            onChange={(e) => handlePourcentageChange(e.target.value)}
+            className="input-field w-full"
+            placeholder="Ex: 30"
+          />
+        </div>
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
             Montant (€) *
           </label>
           <input
-            type="number"
+            type="text"
+            inputMode="decimal"
+            pattern="^[0-9]+([.,][0-9]{0,2})?$"
             required
-            step="0.01"
             value={formData.montant}
             onChange={(e) => setFormData(prev => ({ ...prev, montant: e.target.value }))}
             className="input-field w-full"
@@ -958,15 +1138,6 @@ function PaiementForm({
           className="input-field w-full resize-none"
           placeholder="Notes sur le paiement..."
         />
-      </div>
-
-      <div className="bg-blue-600/10 border border-blue-600/20 rounded-lg p-3">
-        <h4 className="text-sm font-medium text-blue-400 mb-2">💡 Suggestions de répartition :</h4>
-        <div className="text-xs text-gray-300 space-y-1">
-          <p>• <strong>Acompte</strong> : 30% à la signature (avant début des travaux)</p>
-          <p>• <strong>Situation</strong> : 40% en cours de travaux (à mi-parcours)</p>
-          <p>• <strong>Solde final</strong> : 30% à la livraison/réception</p>
-        </div>
       </div>
 
       <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-700">

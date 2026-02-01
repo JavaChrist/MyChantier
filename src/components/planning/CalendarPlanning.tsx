@@ -991,25 +991,33 @@ function AgendaView({
     const endDate = new Date(now);
     endDate.setDate(endDate.getDate() + filterDays);
 
-    // Ajouter les rendez-vous (format V2 : dateDebut)
+    // Ajouter les rendez-vous (V2 + legacy)
     rendezVous.forEach((rdv: RendezVous) => {
-      const rdvDate = rdv.dateDebut; // Format V2
+      const legacyRdv = rdv as RendezVous & { dateHeure?: Date; confirme?: boolean; lieu?: string };
+      const rdvDate = rdv.dateDebut ?? legacyRdv.dateHeure ?? rdv.dateFin;
       if (rdvDate && rdvDate >= now && rdvDate <= endDate) {
-        const entreprise = entreprises.find((e: any) => e.id === rdv.entrepriseId);
-        const entrepriseId = rdv.entrepriseId ?? DEFAULT_ENTREPRISE_ID;
+        const normalizedRdv: RendezVous = {
+          ...rdv,
+          dateDebut: rdv.dateDebut ?? rdvDate,
+          dateFin: rdv.dateFin ?? rdvDate,
+          description: rdv.description ?? legacyRdv.lieu ?? '',
+          statut: rdv.statut ?? 'planifie'
+        };
+        const entreprise = entreprises.find((e: any) => e.id === normalizedRdv.entrepriseId);
+        const entrepriseId = normalizedRdv.entrepriseId ?? DEFAULT_ENTREPRISE_ID;
         if (filterEntreprise === 'all' || entrepriseId === filterEntreprise) {
           if (filterType === 'all' || filterType === 'rendez-vous') {
             events.push({
-              id: `rdv-${rdv.id}`,
+              id: `rdv-${normalizedRdv.id}`,
               type: 'rendez-vous',
               date: rdvDate,
-              title: rdv.titre,
-              description: `${rdv.type || 'Rendez-vous'} ${rdv.description ? '- ' + rdv.description : ''}`,
+              title: normalizedRdv.titre,
+              description: `${normalizedRdv.type || 'Rendez-vous'} ${normalizedRdv.description ? '- ' + normalizedRdv.description : ''}`,
               entrepriseId,
               entrepriseNom: entreprise?.nom || 'Entreprise inconnue',
-              lieu: rdv.description || '',
-              statut: rdv.statut || 'planifie',
-              data: rdv
+              lieu: normalizedRdv.description || '',
+              statut: normalizedRdv.statut || 'planifie',
+              data: normalizedRdv
             });
           }
         }

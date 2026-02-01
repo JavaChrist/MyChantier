@@ -242,10 +242,10 @@ export function EntreprisesManager() {
           return (
             <div
               key={entreprise.id}
-              className={`card-mobile hover:bg-gray-750 transition-colors cursor-pointer border-l-4 ${couleur.border}`}
+              className={`card-mobile hover:bg-gray-750 transition-colors cursor-pointer border-l-4 ${couleur.border} flex flex-col h-full`}
               onClick={() => handleEditEntreprise(entreprise)}
             >
-              <div className="flex items-start justify-between mb-4">
+              <div className="flex items-start justify-between mb-4 min-h-[84px]">
                 <div className="flex items-center space-x-3">
                   <div className={`p-2 rounded-lg ${couleur.bg}`}>
                     {(() => {
@@ -256,9 +256,9 @@ export function EntreprisesManager() {
                   <div>
                     <h3 className="font-semibold text-gray-100">{entreprise.nom}</h3>
                     <p className="text-sm text-gray-400">{getSecteurLabel(entreprise.secteurActivite)}</p>
-                    {entreprise.siret && (
-                      <p className="text-xs text-gray-500">SIRET: {entreprise.siret}</p>
-                    )}
+                    <p className={`text-xs ${entreprise.siret ? 'text-gray-500' : 'text-gray-600'}`}>
+                      SIRET: {entreprise.siret || '—'}
+                    </p>
                   </div>
                 </div>
                 <div className="flex space-x-1">
@@ -283,22 +283,26 @@ export function EntreprisesManager() {
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 flex-1 min-h-[88px]">
                 <div className="flex items-center space-x-2 text-sm">
                   <Phone className="w-4 h-4 text-gray-400" />
-                  <span className="text-gray-300">{entreprise.contact.telephone}</span>
+                  <span className={entreprise.contact.telephone ? 'text-gray-300' : 'text-gray-500'}>
+                    {entreprise.contact.telephone || '—'}
+                  </span>
                 </div>
                 <div className="flex items-center space-x-2 text-sm">
                   <Mail className="w-4 h-4 text-gray-400" />
-                  <span className="text-gray-300">{entreprise.contact.email}</span>
+                  <span className={entreprise.contact.email ? 'text-gray-300' : 'text-gray-500'}>
+                    {entreprise.contact.email || '—'}
+                  </span>
                 </div>
-                <div className="text-sm text-gray-300">
-                  {entreprise.contact.nom}
+                <div className={entreprise.contact.nom ? 'text-sm text-gray-300' : 'text-sm text-gray-500'}>
+                  {entreprise.contact.nom || '—'}
                 </div>
               </div>
 
               {/* Actions rapides */}
-              <div className="mt-4 pt-4 border-t border-gray-700">
+              <div className="mt-auto pt-4 border-t border-gray-700">
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={(e) => {
