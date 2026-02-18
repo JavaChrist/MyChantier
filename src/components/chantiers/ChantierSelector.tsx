@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Calendar, MapPin, Users, ArrowRight, Edit2, LogOut, Trash2, Mail } from 'lucide-react';
+import { Plus, Calendar, MapPin, Users, ArrowRight, Edit2, LogOut, Trash2, Mail, X } from 'lucide-react';
 import { AppIcon } from '../Icon';
 import type { Chantier } from '../../firebase/chantiers';
 import { useChantier } from '../../contexts/ChantierContext';
@@ -621,7 +621,7 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
     try {
       console.log(`🔄 Modification chantier ${selectedChantier.id}`);
 
-      const { doc, setDoc, Timestamp } = await import('firebase/firestore');
+      const { doc, setDoc, updateDoc, Timestamp, deleteField } = await import('firebase/firestore');
       const { db } = await import('../../firebase/config');
 
       const chantierDataForFirebase: any = {
@@ -640,12 +640,16 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
         dateModification: Timestamp.fromDate(new Date())
       };
 
-      // Ajouter les emails supplémentaires s'ils existent
+      // Ajouter ou supprimer les emails supplémentaires
       if (chantierData.clientEmail2 && chantierData.clientEmail2.trim()) {
         chantierDataForFirebase.clientEmail2 = chantierData.clientEmail2.trim();
+      } else {
+        chantierDataForFirebase.clientEmail2 = deleteField();
       }
       if (chantierData.clientEmail3 && chantierData.clientEmail3.trim()) {
         chantierDataForFirebase.clientEmail3 = chantierData.clientEmail3.trim();
+      } else {
+        chantierDataForFirebase.clientEmail3 = deleteField();
       }
 
       console.log('📦 Données de mise à jour avec emails:', {
@@ -655,8 +659,15 @@ export function ChantierSelector({ professionalId, professionalName, onLogout }:
       });
 
       // Mettre à jour le document parent
-      await setDoc(doc(db, 'chantiers', selectedChantier.id!), chantierDataForFirebase);
+      await updateDoc(doc(db, 'chantiers', selectedChantier.id!), chantierDataForFirebase);
       console.log('✅ Chantier modifié dans Firebase V2');
+
+      // Mettre à jour la sous-collection info si elle existe
+      const { collection, getDocs } = await import('firebase/firestore');
+      const infoSnapshot = await getDocs(collection(db, `chantiers/${selectedChantier.id!}/info`));
+      if (infoSnapshot.docs.length > 0) {
+        await updateDoc(infoSnapshot.docs[0].ref, chantierDataForFirebase);
+      }
 
       // Recharger la liste
       await loadChantiers();
@@ -1253,13 +1264,26 @@ function NewChantierForm({
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Email secondaire (facultatif)
             </label>
-            <input
-              type="email"
-              value={formData.clientEmail2}
-              onChange={(e) => setFormData(prev => ({ ...prev, clientEmail2: e.target.value }))}
-              className="input-field w-full"
-              placeholder="conjoint@exemple.com"
-            />
+            <div className="relative">
+              <input
+                type="email"
+                value={formData.clientEmail2}
+                onChange={(e) => setFormData(prev => ({ ...prev, clientEmail2: e.target.value }))}
+                className="input-field w-full pr-10"
+                placeholder="conjoint@exemple.com"
+              />
+              {formData.clientEmail2 && (
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, clientEmail2: '' }))}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-gray-400 hover:text-red-400 hover:bg-gray-700/60"
+                  aria-label="Supprimer l'email secondaire"
+                  title="Supprimer l'email secondaire"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
             <p className="text-xs text-gray-400 mt-1">
               Accès au même chantier
             </p>
@@ -1269,13 +1293,26 @@ function NewChantierForm({
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Email tertiaire (facultatif)
             </label>
-            <input
-              type="email"
-              value={formData.clientEmail3}
-              onChange={(e) => setFormData(prev => ({ ...prev, clientEmail3: e.target.value }))}
-              className="input-field w-full"
-              placeholder="autre@exemple.com"
-            />
+            <div className="relative">
+              <input
+                type="email"
+                value={formData.clientEmail3}
+                onChange={(e) => setFormData(prev => ({ ...prev, clientEmail3: e.target.value }))}
+                className="input-field w-full pr-10"
+                placeholder="autre@exemple.com"
+              />
+              {formData.clientEmail3 && (
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, clientEmail3: '' }))}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full text-gray-400 hover:text-red-400 hover:bg-gray-700/60"
+                  aria-label="Supprimer l'email tertiaire"
+                  title="Supprimer l'email tertiaire"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
             <p className="text-xs text-gray-400 mt-1">
               Accès au même chantier
             </p>

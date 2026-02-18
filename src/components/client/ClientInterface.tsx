@@ -21,6 +21,7 @@ export function ClientInterface({ userProfile, chantierId, onLogout, onChangeCha
   const [currentView, setCurrentView] = useState('overview');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [chantierNom, setChantierNom] = useState('Mon Chantier');
+  const [clientNom, setClientNom] = useState('');
   const [documentsFilter, setDocumentsFilter] = useState<'all' | 'en-attente' | 'valide' | 'refuse'>('all');
   const [budgets, setBudgets] = useState<BudgetPrevisionnel[]>([]);
   const [budgetLoading, setBudgetLoading] = useState(false);
@@ -37,7 +38,9 @@ export function ClientInterface({ userProfile, chantierId, onLogout, onChangeCha
         const { db } = await import('../../firebase/config');
         const chantierDoc = await getDoc(doc(db, 'chantiers', chantierId));
         if (chantierDoc.exists()) {
-          setChantierNom(chantierDoc.data().nom || 'Mon Chantier');
+          const data = chantierDoc.data();
+          setChantierNom(data.nom || 'Mon Chantier');
+          setClientNom(data.clientNom || '');
         }
       } catch (error) {
         console.error('Erreur chargement nom chantier:', error);
@@ -173,7 +176,7 @@ export function ClientInterface({ userProfile, chantierId, onLogout, onChangeCha
               </button>
               <div>
                 <h1 className="text-xl md:text-2xl font-bold text-gray-800">{chantierNom}</h1>
-                <p className="text-sm text-gray-600">{userProfile.displayName}</p>
+                <p className="text-sm text-gray-600">{clientNom || userProfile.displayName}</p>
               </div>
             </div>
             <div className="flex items-center space-x-2">

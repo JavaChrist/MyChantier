@@ -522,7 +522,7 @@ export function PaiementsGlobaux() {
         onClose={() => setShowBudgetModal(false)}
         title={selectedBudget ? 'Modifier le budget' : 'Nouveau budget prévisionnel'}
         size="lg"
-        bodyClassName="overflow-y-auto lg:overflow-y-visible"
+        bodyClassName="overflow-y-auto scrollbar-hide"
       >
         <BudgetForm
           budget={selectedBudget}
@@ -655,7 +655,7 @@ function BudgetForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4 pb-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -797,7 +797,7 @@ function BudgetForm({
         />
       </div>
 
-      <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-700">
+      <div className="flex items-center justify-end space-x-3 pt-4 border-t border-gray-700 mt-2">
         <button
           type="button"
           onClick={onCancel}
