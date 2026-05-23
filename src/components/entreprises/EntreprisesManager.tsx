@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Search, Phone, Mail, FileText, CreditCard, ShoppingCart, Edit2, Trash2, Wrench, Zap, Hammer, Paintbrush, DoorOpen } from 'lucide-react';
+import { Plus, Search, Phone, Mail, FileText, CreditCard, ShoppingCart, Edit2, Trash2, Wrench, Zap, Hammer, Paintbrush, DoorOpen, Receipt } from 'lucide-react';
 import { entreprisesService } from '../../firebase/entreprises';
 import type { Entreprise } from '../../firebase/entreprises';
 import { useChantier } from '../../contexts/ChantierContext';
@@ -10,6 +10,7 @@ import { EntrepriseForm } from './EntrepriseForm';
 import { DevisManager } from './DevisManager';
 import { CommandesManager } from './CommandesManager';
 import { PaiementsManager } from './PaiementsManager';
+import { FacturesManager } from './FacturesManager';
 import { useAlertModal } from '../AlertModal';
 
 // Couleurs par secteur d'activité
@@ -23,7 +24,7 @@ const COULEURS_SECTEURS = {
 
 export function EntreprisesManager() {
   const { chantierId, chantierActuel } = useChantier();
-  const { entreprises, devis, commandes, paiements, loading, reloadData } = useChantierData(chantierId);
+  const { entreprises, devis, commandes, paiements, factures, loading, reloadData } = useChantierData(chantierId);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSecteur, setSelectedSecteur] = useState<string>('all');
@@ -32,6 +33,7 @@ export function EntreprisesManager() {
   const [showDevis, setShowDevis] = useState<string | null>(null);
   const [showCommandes, setShowCommandes] = useState<string | null>(null);
   const [showPaiements, setShowPaiements] = useState<string | null>(null);
+  const [showFactures, setShowFactures] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [entrepriseToDelete, setEntrepriseToDelete] = useState<Entreprise | null>(null);
   const { showAlert, AlertModalComponent } = useAlertModal();
@@ -41,7 +43,8 @@ export function EntreprisesManager() {
     return {
       devisCount: devis.filter(d => d.entrepriseId === entrepriseId).length,
       commandesCount: commandes.filter(c => c.entrepriseId === entrepriseId).length,
-      paiementsCount: paiements.filter(p => p.entrepriseId === entrepriseId).length
+      paiementsCount: paiements.filter(p => p.entrepriseId === entrepriseId).length,
+      facturesCount: factures.filter(f => f.entrepriseId === entrepriseId).length
     };
   };
 
@@ -364,6 +367,26 @@ export function EntreprisesManager() {
                       ) : null;
                     })()}
                   </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowFactures(entreprise.id || null);
+                    }}
+                    className="grow basis-[150px] shrink-0 flex flex-col items-center justify-center px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded text-xs text-white transition-colors relative"
+                  >
+                    <div className="flex items-center space-x-1">
+                      <Receipt className="w-3 h-3" />
+                      <span>Factures</span>
+                    </div>
+                    {(() => {
+                      const stats = getEntrepriseStats(entreprise.id || '');
+                      return stats.facturesCount > 0 ? (
+                        <span className="absolute -top-1 -right-1 bg-purple-400 text-purple-900 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                          {stats.facturesCount}
+                        </span>
+                      ) : null;
+                    })()}
+                  </button>
                 </div>
               </div>
 
@@ -457,6 +480,26 @@ export function EntreprisesManager() {
           <PaiementsManager
             entrepriseId={showPaiements}
             entrepriseName={entreprises.find(e => e.id === showPaiements)?.nom || ''}
+            chantierId={chantierId || ''}
+          />
+        </Modal>
+      )}
+
+      {/* Modal pour les factures */}
+      {showFactures && (
+        <Modal
+          isOpen={true}
+          onClose={() => {
+            setShowFactures(null);
+            reloadData();
+          }}
+          title="Gestion des Factures"
+          size="xl"
+          bodyClassName="overflow-y-auto scrollbar-hide"
+        >
+          <FacturesManager
+            entrepriseId={showFactures}
+            entrepriseName={entreprises.find(e => e.id === showFactures)?.nom || ''}
             chantierId={chantierId || ''}
           />
         </Modal>

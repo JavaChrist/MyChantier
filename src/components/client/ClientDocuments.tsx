@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, CheckCircle, Download, X, FolderOpen } from 'lucide-react';
+import { FileText, CheckCircle, Download, X, FolderOpen, Receipt } from 'lucide-react';
 import { Modal } from '../Modal';
 import { unifiedDevisService, unifiedDocumentsService } from '../../firebase/unified-services';
 import { useAlertModal } from '../AlertModal';
@@ -34,13 +34,14 @@ const getSecteurCouleur = (secteur?: string): SecteurColor => {
 
 interface ClientDocumentsProps {
   devis: any[];
+  factures?: any[];
   chantierId: string;
   onReload?: () => void;
   entreprises?: any[];
   initialFilter?: 'all' | 'en-attente' | 'valide' | 'refuse';
 }
 
-export function ClientDocuments({ devis, chantierId, onReload, entreprises = [], initialFilter = 'all' }: ClientDocumentsProps) {
+export function ClientDocuments({ devis, factures = [], chantierId, onReload, entreprises = [], initialFilter = 'all' }: ClientDocumentsProps) {
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [validationAction, setValidationAction] = useState<{ devis: any; decision: 'valide' | 'refuse' } | null>(null);
   const [documents, setDocuments] = useState<any[]>([]);
@@ -341,6 +342,170 @@ export function ClientDocuments({ devis, chantierId, onReload, entreprises = [],
           <p>• <strong>Validez ou refusez</strong> directement depuis cette interface</p>
           <p>• <strong>Contactez</strong> votre professionnel via la messagerie si vous avez des questions</p>
         </div>
+      </div>
+
+      {/* Factures */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <Receipt className="w-6 h-6 text-purple-600" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-gray-800">Vos factures</h2>
+              <p className="text-sm text-gray-600">Factures émises par vos prestataires</p>
+            </div>
+          </div>
+          <div className="text-sm text-gray-500">
+            {factures.length} facture{factures.length > 1 ? 's' : ''}
+          </div>
+        </div>
+
+        {factures.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Receipt className="w-8 h-8 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-600 mb-2">Aucune facture pour le moment</h3>
+            <p className="text-gray-500">
+              Les factures émises par vos prestataires apparaîtront ici
+            </p>
+          </div>
+        ) : (
+          (() => {
+            // Regrouper par entreprise
+            const facturesParEntreprise = factures.reduce<Record<string, any[]>>((acc, f) => {
+              const key = f.entrepriseId || 'autres';
+              if (!acc[key]) acc[key] = [];
+              acc[key].push(f);
+              return acc;
+            }, {});
+
+            const groupes = Object.keys(facturesParEntreprise).map(key => {
+              const ent = entreprises.find(e => e.id === key);
+              return {
+                entreprise: ent || {
+                  id: key,
+                  nom: facturesParEntreprise[key][0]?.entrepriseNom || 'Entreprise inconnue',
+                  secteurActivite: facturesParEntreprise[key][0]?.secteurActivite || 'sanitaire'
+                },
+                factures: facturesParEntreprise[key]
+              };
+            });
+
+            return (
+              <div className="space-y-6">
+                {groupes.map(({ entreprise, factures: facturesEnt }) => {
+                  const couleur = getSecteurCouleur(entreprise?.secteurActivite);
+                  return (
+                    <div
+                      key={entreprise.id}
+                      className={`bg-white border border-gray-100 rounded-xl shadow-sm border-l-4 ${couleur.borderLeft} p-4`}
+                    >
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <span className={`w-2.5 h-2.5 rounded-full ${couleur.dot}`} />
+                          <div>
+                            <p className="font-semibold text-gray-800">{entreprise.nom}</p>
+                            <span className={`inline-flex mt-1 px-2 py-0.5 text-xs rounded-full ${couleur.badgeBg} ${couleur.badgeText}`}>
+                              {entreprise.secteurActivite || 'Corps de métier'}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="text-sm text-gray-500">
+                          {facturesEnt.length} facture{facturesEnt.length > 1 ? 's' : ''}
+                        </span>
+                      </div>
+
+                      <div className="space-y-3">
+                        {facturesEnt.map((facture: any) => {
+                          const statutColor =
+                            facture.statut === 'payee'
+                              ? 'bg-green-100 text-green-800 border-green-200'
+                              : facture.statut === 'annulee'
+                                ? 'bg-red-100 text-red-800 border-red-200'
+                                : 'bg-yellow-100 text-yellow-800 border-yellow-200';
+                          const statutLabel =
+                            facture.statut === 'payee'
+                              ? '✅ Payée'
+                              : facture.statut === 'annulee'
+                                ? '❌ Annulée'
+                                : '⏳ En attente';
+                          return (
+                            <div
+                              key={facture.id}
+                              className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-all"
+                            >
+                              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between mb-3">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center space-x-2 mb-1">
+                                    <h4 className="font-semibold text-gray-800 truncate">
+                                      {facture.numero}
+                                    </h4>
+                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${statutColor}`}>
+                                      {statutLabel}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-gray-600">{facture.prestationNom}</p>
+                                  {facture.description && (
+                                    <p className="text-xs text-gray-500 mt-1">{facture.description}</p>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-lg font-bold text-gray-800">
+                                    {facture.montantTTC?.toLocaleString() || '0'} €
+                                  </p>
+                                  <p className="text-xs text-gray-500">TTC</p>
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm mb-3">
+                                <div className="bg-gray-50 rounded-lg p-2">
+                                  <span className="text-xs text-gray-500">Émise le</span>
+                                  <p className="text-sm font-medium text-gray-800">
+                                    {facture.dateEmission?.toLocaleDateString('fr-FR') || '—'}
+                                  </p>
+                                </div>
+                                <div className="bg-gray-50 rounded-lg p-2">
+                                  <span className="text-xs text-gray-500">Échéance</span>
+                                  <p className="text-sm font-medium text-gray-800">
+                                    {facture.dateEcheance?.toLocaleDateString('fr-FR') || '—'}
+                                  </p>
+                                </div>
+                                <div className="bg-gray-50 rounded-lg p-2">
+                                  <span className="text-xs text-gray-500">Montant HT</span>
+                                  <p className="text-sm font-medium text-gray-800">
+                                    {facture.montantHT?.toLocaleString() || '0'} €
+                                  </p>
+                                </div>
+                              </div>
+
+                              {facture.fichierUrl ? (
+                                <a
+                                  href={facture.fichierUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="w-full inline-flex items-center justify-center space-x-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors text-sm"
+                                >
+                                  <Download className="w-4 h-4" />
+                                  <span>Télécharger la facture</span>
+                                </a>
+                              ) : (
+                                <div className="w-full text-center py-2 bg-gray-100 text-gray-500 rounded-lg text-sm">
+                                  Fichier non disponible
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()
+        )}
       </div>
 
       {/* Documents administratifs */}

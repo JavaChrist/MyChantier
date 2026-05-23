@@ -25,7 +25,7 @@ export function ClientInterface({ userProfile, chantierId, onLogout, onChangeCha
   const [documentsFilter, setDocumentsFilter] = useState<'all' | 'en-attente' | 'valide' | 'refuse'>('all');
   const [budgets, setBudgets] = useState<BudgetPrevisionnel[]>([]);
   const [budgetLoading, setBudgetLoading] = useState(false);
-  const { entreprises, devis, commandes, paiements, loading, reloadData } = useChantierData(chantierId);
+  const { entreprises, devis, commandes, paiements, factures, loading, reloadData } = useChantierData(chantierId);
 
   // Compter les messages non lus
   const unreadMessagesCount = useUnreadMessages(chantierId, 'client');
@@ -107,12 +107,17 @@ export function ClientInterface({ userProfile, chantierId, onLogout, onChangeCha
       case 'chat':
         return <ClientChat chantierId={chantierId} userProfile={userProfile} />;
       case 'documents':
-        // Ajouter le nom d'entreprise aux devis
+        // Ajouter le nom d'entreprise aux devis et factures
         const devisAvecEntreprise = devis.map(d => ({
           ...d,
           entrepriseNom: entreprises.find(e => e.id === d.entrepriseId)?.nom || 'Entreprise inconnue'
         }));
-        return <ClientDocuments devis={devisAvecEntreprise} chantierId={chantierId} onReload={reloadData} entreprises={entreprises} initialFilter={documentsFilter} />;
+        const facturesAvecEntreprise = factures.map(f => ({
+          ...f,
+          entrepriseNom: entreprises.find(e => e.id === f.entrepriseId)?.nom || 'Entreprise inconnue',
+          secteurActivite: entreprises.find(e => e.id === f.entrepriseId)?.secteurActivite
+        }));
+        return <ClientDocuments devis={devisAvecEntreprise} factures={facturesAvecEntreprise} chantierId={chantierId} onReload={reloadData} entreprises={entreprises} initialFilter={documentsFilter} />;
       case 'planning':
         return <ClientPlanning chantierId={chantierId} />;
       case 'paiements':

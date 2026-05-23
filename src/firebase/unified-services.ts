@@ -429,6 +429,95 @@ export const unifiedDocumentsService = {
   }
 };
 
+export interface Facture {
+  id?: string;
+  entrepriseId: string;
+  commandeId?: string;
+  devisId?: string;
+  numero: string;
+  prestationNom: string;
+  description?: string;
+  montantHT: number;
+  montantTTC: number;
+  dateEmission: Date;
+  dateEcheance?: Date;
+  datePaiement?: Date;
+  statut: 'en-attente' | 'payee' | 'annulee';
+  fichierUrl?: string;
+  fichierNom?: string;
+  notes?: string;
+}
+
+export const unifiedFacturesService = {
+  async getByChantier(chantierId: string): Promise<Facture[]> {
+    try {
+      const q = query(
+        collection(db, `chantiers/${chantierId}/factures`),
+        orderBy('dateEmission', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          dateEmission: data.dateEmission?.toDate() || new Date(),
+          dateEcheance: data.dateEcheance?.toDate(),
+          datePaiement: data.datePaiement?.toDate()
+        } as Facture;
+      });
+    } catch (error) {
+      console.error(`❌ Erreur chargement factures ${chantierId}:`, error);
+      return [];
+    }
+  },
+
+  async create(chantierId: string, facture: Omit<Facture, 'id'>): Promise<string> {
+    const data: any = {};
+    Object.entries(facture).forEach(([key, value]) => {
+      if (value !== undefined && value !== '') {
+        data[key] = value;
+      }
+    });
+    data.dateEmission = Timestamp.fromDate(facture.dateEmission);
+    if (facture.dateEcheance) {
+      data.dateEcheance = Timestamp.fromDate(facture.dateEcheance);
+    }
+    if (facture.datePaiement) {
+      data.datePaiement = Timestamp.fromDate(facture.datePaiement);
+    }
+    const docRef = await addDoc(collection(db, `chantiers/${chantierId}/factures`), data);
+    console.log(`✅ Facture créée avec ID: ${docRef.id} dans chantiers/${chantierId}/factures`);
+    return docRef.id;
+  },
+
+  async update(chantierId: string, factureId: string, updates: Partial<Facture>): Promise<void> {
+    const docRef = doc(db, `chantiers/${chantierId}/factures`, factureId);
+    const updateData: any = {};
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value !== undefined) {
+        updateData[key] = value;
+      }
+    });
+    if (updateData.dateEmission) {
+      updateData.dateEmission = Timestamp.fromDate(updateData.dateEmission);
+    }
+    if (updateData.dateEcheance) {
+      updateData.dateEcheance = Timestamp.fromDate(updateData.dateEcheance);
+    }
+    if (updateData.datePaiement) {
+      updateData.datePaiement = Timestamp.fromDate(updateData.datePaiement);
+    }
+    await updateDoc(docRef, updateData);
+    console.log(`✅ Facture ${factureId} mise à jour dans ${chantierId}`);
+  },
+
+  async delete(chantierId: string, factureId: string): Promise<void> {
+    await deleteDoc(doc(db, `chantiers/${chantierId}/factures`, factureId));
+    console.log(`✅ Facture ${factureId} supprimée de ${chantierId}`);
+  }
+};
+
 export interface BudgetPrevisionnel {
   id?: string;
   nom: string;

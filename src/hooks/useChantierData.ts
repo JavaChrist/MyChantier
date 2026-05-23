@@ -5,9 +5,10 @@ import {
   unifiedCommandesService,
   unifiedPaiementsService,
   unifiedDocumentsService,
-  unifiedPlanningService
+  unifiedPlanningService,
+  unifiedFacturesService
 } from '../firebase/unified-services';
-import type { Entreprise, Devis, Commande, Paiement, DocumentOfficiel, RendezVous } from '../firebase/unified-services';
+import type { Entreprise, Devis, Commande, Paiement, DocumentOfficiel, RendezVous, Facture } from '../firebase/unified-services';
 
 // Hook pour charger toutes les données d'un chantier
 export function useChantierData(chantierId: string | null) {
@@ -17,6 +18,7 @@ export function useChantierData(chantierId: string | null) {
   const [paiements, setPaiements] = useState<Paiement[]>([]);
   const [documents, setDocuments] = useState<DocumentOfficiel[]>([]);
   const [rendezVous, setRendezVous] = useState<RendezVous[]>([]);
+  const [factures, setFactures] = useState<Facture[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,6 +31,7 @@ export function useChantierData(chantierId: string | null) {
       setPaiements([]);
       setDocuments([]);
       setRendezVous([]);
+      setFactures([]);
       return;
     }
 
@@ -45,13 +48,14 @@ export function useChantierData(chantierId: string | null) {
       console.log(`🔍 CHARGEMENT V2 pour chantier: ${chantierId}`);
 
       // STRUCTURE UNIFIÉE V2 - Tous les chantiers utilisent la même logique
-      const [entreprisesData, devisData, commandesData, paiementsData, documentsData, planningData] = await Promise.all([
+      const [entreprisesData, devisData, commandesData, paiementsData, documentsData, planningData, facturesData] = await Promise.all([
         unifiedEntreprisesService.getByChantier(chantierId),
         unifiedDevisService.getByChantier(chantierId),
         unifiedCommandesService.getByChantier(chantierId),
         unifiedPaiementsService.getByChantier(chantierId),
         unifiedDocumentsService.getByChantier(chantierId),
-        unifiedPlanningService.getByChantier(chantierId)
+        unifiedPlanningService.getByChantier(chantierId),
+        unifiedFacturesService.getByChantier(chantierId)
       ]);
 
       setEntreprises(entreprisesData);
@@ -60,6 +64,7 @@ export function useChantierData(chantierId: string | null) {
       setPaiements(paiementsData);
       setDocuments(documentsData);
       setRendezVous(planningData);
+      setFactures(facturesData);
 
       console.log(`✅ CHANTIER V2 ${chantierId} chargé:`, {
         entreprises: entreprisesData.length,
@@ -67,7 +72,8 @@ export function useChantierData(chantierId: string | null) {
         commandes: commandesData.length,
         paiements: paiementsData.length,
         documents: documentsData.length,
-        planning: planningData.length
+        planning: planningData.length,
+        factures: facturesData.length
       });
 
     } catch (error) {
@@ -80,6 +86,7 @@ export function useChantierData(chantierId: string | null) {
       setPaiements([]);
       setDocuments([]);
       setRendezVous([]);
+      setFactures([]);
     } finally {
       setLoading(false);
     }
@@ -92,6 +99,7 @@ export function useChantierData(chantierId: string | null) {
     paiements,
     documents,
     rendezVous,
+    factures,
     loading,
     error,
     reloadData: loadChantierData
